@@ -9,6 +9,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { Check as CheckIcon } from "@phosphor-icons/react/dist/ssr/Check";
 
+
 // Dies ist unser finales Objekt aus dem Wizard
 interface CategoryFormData {
   categoryType: string;
@@ -27,7 +28,8 @@ export function CategoryPreview({ formData }: CategoryPreviewProps): React.JSX.E
   // Final speichern => POST /api/categories
   const handleFinish = React.useCallback(async () => {
     try {
-      const response = await fetch("/api/categories", {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL; // Lade URL aus .env
+      const response = await fetch(`${baseUrl}/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -44,7 +46,6 @@ export function CategoryPreview({ formData }: CategoryPreviewProps): React.JSX.E
         return;
       }
       const created = await response.json();
-      alert(`Kategorie erfolgreich angelegt: ${created.name}`);
       router.push("/dashboard/categories");
     } catch (err) {
       console.error("handleFinish error:", err);

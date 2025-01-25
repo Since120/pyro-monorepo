@@ -6,7 +6,12 @@
   "scripts": {
     "dev:bot": "pnpm --filter pyro-bot dev",
     "dev:dash": "pnpm --filter pyro-dashboard dev",
-    "dev:api": "pnpm --filter pyro-api start:dev"
+    "dev:api": "pnpm --filter pyro-api start:dev",
+    "studio": "pnpm --filter pyro-prisma run studio",
+    "generate": "pnpm --filter pyro-prisma prisma generate",
+    "migrate": "pnpm --filter pyro-prisma prisma migrate"
+
+
   },
   "keywords": [],
   "author": "",

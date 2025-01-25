@@ -49,3 +49,4 @@ logs/
 # Env files, if you don't want them in git
 .env
 .env.*
+.env.local

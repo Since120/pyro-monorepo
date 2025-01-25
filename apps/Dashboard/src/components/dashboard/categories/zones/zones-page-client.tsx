@@ -38,7 +38,8 @@ export function ZonesPageClient() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch("/api/zones");
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+        const res = await fetch(`${baseUrl}/zones`);
         if (!res.ok) {
           throw new Error(`Error ${res.status} ${res.statusText}`);
         }
@@ -69,6 +70,13 @@ export function ZonesPageClient() {
   
     fetchZones();
   }, []);
+
+      // 2) Funktion, um gelöschte ZoneIDs aus dem State zu entfernen
+   const handleZonesDeleted = React.useCallback((deletedIds: string[]) => {
+      // Lokal State anpassen => UI sofort aktualisiert
+      setZones((prev) => prev.filter((z) => !deletedIds.includes(z.id)));
+    }, []);
+
 
   // 3) Filtern + Sortieren (clientseitig)
   // => Du kannst es wie in der alten Dummy-Logik belassen, falls gewünscht
@@ -118,6 +126,7 @@ export function ZonesPageClient() {
             <ZonesFilters
               filters={{ zoneKey: zoneKeyParam, name: nameParam }}
               sortDir={sortDir}
+              onZonesDeleted={handleZonesDeleted}
             />
             <Divider />
 

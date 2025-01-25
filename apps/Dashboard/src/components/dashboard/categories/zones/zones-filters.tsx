@@ -1,4 +1,3 @@
-// apps/dashboard/src/components/dashboard/categories/zones/zones-filters.tsx
 "use client";
 
 import * as React from "react";
@@ -8,15 +7,12 @@ import Divider from "@mui/material/Divider";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import OutlinedInput from "@mui/material/OutlinedInput";
-import Select from "@mui/material/Select";
-import type { SelectChangeEvent } from "@mui/material";
+import Select, { SelectChangeEvent } from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
-import { Option } from "@/components/core/option"; // falls du so etwas hast
 import { useZonesSelection } from "./zones-selection-context";
 
-// Filter-Interfaces
 export interface Filters {
   zoneKey?: string;
   name?: string;
@@ -24,16 +20,21 @@ export interface Filters {
 export type SortDir = "asc" | "desc";
 
 export interface ZonesFiltersProps {
-  filters: Filters;   // z. B. { zoneKey, name }
-  sortDir: SortDir;   // "asc" oder "desc"
+  filters: Filters;         // z. B. { zoneKey, name }
+  sortDir: SortDir;         // "asc" oder "desc"
+  onZonesDeleted?: (deletedIds: string[]) => void;  // <-- Neue Callback
 }
 
-export function ZonesFilters({ filters, sortDir }: ZonesFiltersProps) {
+export function ZonesFilters({
+  filters,
+  sortDir,
+  onZonesDeleted,            // <-- WICHTIG: Destructure / entpacken
+}: ZonesFiltersProps) {
   const { zoneKey, name } = filters;
   const router = useRouter();
   const selection = useZonesSelection();
 
-  // helper
+  // Hilfsfunktion zum URL-Update
   const updateSearchParams = React.useCallback(
     (newFilters: Filters, newSortDir: SortDir) => {
       const searchParams = new URLSearchParams();
@@ -47,13 +48,11 @@ export function ZonesFilters({ filters, sortDir }: ZonesFiltersProps) {
       if (newSortDir === "asc") {
         searchParams.set("sortDir", "asc");
       }
-      // dann URL updaten
       router.push(`?${searchParams.toString()}`);
-        },
+    },
     [router]
   );
 
-  // Input-Änderungen => Filter updaten
   const handleZoneKeyChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
     updateSearchParams({ ...filters, zoneKey: ev.target.value }, sortDir);
   };
@@ -61,24 +60,47 @@ export function ZonesFilters({ filters, sortDir }: ZonesFiltersProps) {
     updateSearchParams({ ...filters, name: ev.target.value }, sortDir);
   };
 
-  // Sort
   const handleSortChange = (ev: SelectChangeEvent) => {
     updateSearchParams(filters, ev.target.value as SortDir);
   };
 
-  // Clear
   const hasFilters = !!(zoneKey || name);
   const handleClear = () => {
     updateSearchParams({}, sortDir);
   };
 
-  // Mehrfach-Löschung
+  // **Mehrfach-Löschung**
   const handleDeleteSelected = React.useCallback(async () => {
-    if (!window.confirm("Möchtest du alle selektierten Zonen wirklich löschen (Dummy)?")) {
+    if (!window.confirm("Möchtest du alle selektierten Zonen wirklich löschen?")) {
       return;
     }
-    alert("Hier würdest du (Dummy) die selektierten Zonen löschen.");
-  }, []);
+
+    const idsToDelete = Array.from(selection.selected);
+    if (idsToDelete.length === 0) {
+      alert("Keine Zonen ausgewählt");
+      return;
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    try {
+      const res = await fetch(`${baseUrl}/zones/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zoneIds: idsToDelete }),
+      });
+      if (!res.ok) {
+        console.error("Fehler beim Bulk-Löschen");
+        return;
+      }
+
+      // Nach Erfolg rufen wir dein Parent-Callback auf, wenn vorhanden
+      if (onZonesDeleted) {
+        onZonesDeleted(idsToDelete);
+      }
+    } catch (err) {
+      console.error("Mehrfach-Löschung error:", err);
+    }
+  }, [selection.selected, onZonesDeleted]);
 
   return (
     <>
@@ -117,6 +139,7 @@ export function ZonesFilters({ filters, sortDir }: ZonesFiltersProps) {
 
         {/* RECHTS: (Selektion) + Sort */}
         <Stack direction="row" spacing={2} alignItems="flex-end">
+          {/* Falls mindestens 1 Zeile ausgewählt => Delete-Button */}
           {selection.selectedAny && (
             <Stack direction="row" spacing={1.5} alignItems="center">
               <Typography color="text.secondary" variant="body2">
@@ -141,8 +164,8 @@ export function ZonesFilters({ filters, sortDir }: ZonesFiltersProps) {
               onChange={handleSortChange}
               sx={{ width: 100 }}
             >
-              <Option value="desc">Desc</Option>
-              <Option value="asc">Asc</Option>
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
             </Select>
           </FormControl>
         </Stack>

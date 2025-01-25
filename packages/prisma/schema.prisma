@@ -14,33 +14,17 @@ model User {
   createdAt DateTime @default(now())
 }
 
-// ==========================================
-// NEU: Category (für Kategorien im Discord)
-// ==========================================
+
 model Category {
   id                  String   @id @default(cuid())
-
-  // Name (so heißt die Kategorie im Discord)
   name                String
-
-  // categoryType: z. B. "freelancers", "contractors", "employees"
   categoryType        String
-
-  // Wer hat Zugang? (z. B. Discord-Rollen-IDs als String[], später ausbaubar)
   allowedRoles        String[] @default([])
-
-  // Ob andere Member die Kategorie zumindest sehen
   isVisible           Boolean  @default(true)
-
-  // Falls man die letzte Benutzung und Gesamtzeit cachen will:
   lastUsage           DateTime?
   totalSecondsInCateg Int      @default(0)
-
-  // Timestamps
   createdAt           DateTime @default(now())
   updatedAt           DateTime @default(now()) @updatedAt
-
-  // Relation auf Zonen: Eine Kategorie kann mehrere Zonen enthalten
   zones               Zone[]
   discordCategoryId   String?
 
@@ -48,38 +32,21 @@ model Category {
 
 
 
-
-// ===========================
-// Altes Modell: Zone
-// JETZT: Relation auf Category
-// ===========================
 model Zone {
   id              String   @id @default(cuid())
   zoneKey         String   @unique        // NICHT löschen: Bot nutzt es
   zoneName        String
   minutesRequired Int      @default(60)
   pointsGranted   Int      @default(1)
-
-  // NEUE Felder zum Anzeigen in UI:
   lastUsage           DateTime?
   totalSecondsInZone  Int      @default(0)
-
-  // Relation auf Category (optional, damit altes System nicht bricht)
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  // Timestamps
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
-
-  // Falls wir Stats auf Zone-Ebene zuordnen
   userStats  UserZoneStats[]
 }
 
-// ===============================================================
-// WEITERE UNVERÄNDERTE / LEICHT ANGERICHTE MODELLE
-// (Sie bleiben weitgehend, damit altes System nicht bricht)
-// ===============================================================
 
 
 model SetupChannels {

@@ -97,7 +97,7 @@ export function ZonesTable({ rows }: ZonesTableProps) {
             sx={{ textAlign: "center" }}
             variant="body2"
           >
-            No zones found
+            Keine Zone gefunden
           </Typography>
         </Box>
       )}

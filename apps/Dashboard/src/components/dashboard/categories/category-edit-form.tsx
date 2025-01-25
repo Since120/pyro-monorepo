@@ -148,8 +148,9 @@ export function CategoryEditForm({ category }: CategoryEditFormProps) {
         allowedRoles: Array.from(tags), 
       };
   
-      const res = await fetch(`/api/categories/${category.id}`, {
-        method: "PATCH",
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(`${baseUrl}/categories/${category.id}`, {
+      method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -161,7 +162,6 @@ export function CategoryEditForm({ category }: CategoryEditFormProps) {
       }
   
       const updated = await res.json();
-      alert(`Kategorie aktualisiert: ${updated.name}`);
       router.push("/dashboard/categories");
     } catch (err) {
       console.error("handleSave error:", err);
@@ -175,8 +175,9 @@ export function CategoryEditForm({ category }: CategoryEditFormProps) {
     if (!window.confirm("Wirklich löschen?")) return;
   
     try {
-      const res = await fetch(`/api/categories/${category.id}`, {
-        method: "DELETE",
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(`${baseUrl}/categories/${category.id}`, {
+      method: "DELETE",
       });
       if (!res.ok) {
         const errData = await res.json();
@@ -184,7 +185,6 @@ export function CategoryEditForm({ category }: CategoryEditFormProps) {
         return;
       }
   
-      alert("Kategorie gelöscht.");
       router.push("/dashboard/categories");
     } catch (err) {
       console.error("handleDelete error:", err);

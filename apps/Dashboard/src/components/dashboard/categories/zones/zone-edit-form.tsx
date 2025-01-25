@@ -70,7 +70,8 @@ export function ZoneEditForm({ zone }: { zone: ZoneData }) {
         categoryId,
       };
 
-      const res = await fetch(`/api/zones/${zone.id}`, {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(`${baseUrl}/zones/${zone.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -83,7 +84,6 @@ export function ZoneEditForm({ zone }: { zone: ZoneData }) {
       }
 
       const updatedZone = await res.json();
-      alert(`Zone aktualisiert. Key=${updatedZone.zoneKey}`);
       router.push("/dashboard/categories");
     } catch (error) {
       console.error("handleSave error:", error);
@@ -105,7 +105,8 @@ export function ZoneEditForm({ zone }: { zone: ZoneData }) {
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`/api/zones/${zone.id}`, {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(`${baseUrl}/zones/${zone.id}`, {
         method: "DELETE",
       });
 
