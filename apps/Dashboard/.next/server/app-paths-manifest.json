@@ -1,9 +1,1 @@
-{
-  "/api/zones/route": "app/api/zones/route.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/categories/[categoryId]/route": "app/api/categories/[categoryId]/route.js",
-  "/api/categories/route": "app/api/categories/route.js",
-  "/dashboard/categories/edit/[categoryId]/page": "app/dashboard/categories/edit/[categoryId]/page.js",
-  "/dashboard/categories/page": "app/dashboard/categories/page.js",
-  "/dashboard/categories/create/page": "app/dashboard/categories/create/page.js"
-}
+{}

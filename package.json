@@ -4,9 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:bot": "pnpm --filter pyro-bot dev",
+    "dev:dash": "pnpm --filter pyro-dashboard dev",
+    "dev:api": "pnpm --filter pyro-api start:dev"
   },
   "keywords": [],
   "author": "",
   "license": "ISC"
+  
 }

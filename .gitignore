@@ -35,8 +35,17 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Node-related
+node_modules
+pnpm-lock.yaml
+
+
+
 
 dist/
 logs/
+
+
+# Env files, if you don't want them in git
 .env
-.DS_Store
+.env.*

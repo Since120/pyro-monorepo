@@ -13,8 +13,6 @@
     "format:fix": "prettier --write \"**/*.{js,jsx,mjs,ts,tsx,mdx}\" --cache",
     "typecheck": "tsc --noEmit",
     "dev:dashboard": "pnpm --filter dashboard dev",
-    "prisma:generate": "pnpm exec prisma generate --schema=./prisma/schema.prisma",
-    "prisma:migrate": "pnpm exec prisma migrate dev --schema=./prisma/schema.prisma",
     "test": "jest --watch"
   },
   "dependencies": {
