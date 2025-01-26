@@ -31,13 +31,16 @@ export class ZonesService {
     });
   }
 
-  updateZone(zoneId: string, data: Partial<{
-    zoneKey: string;
-    zoneName: string;
-    minutesRequired: number;
-    pointsGranted: number;
-    categoryId?: string | null;
-  }>) {
+  updateZone(
+    zoneId: string,
+    data: Partial<{
+      zoneKey: string;
+      zoneName: string;
+      minutesRequired: number;
+      pointsGranted: number;
+      categoryId?: string | null;
+    }>,
+  ) {
     return this.prisma.zone.update({
       where: { id: zoneId },
       data: {
@@ -57,5 +60,4 @@ export class ZonesService {
       where: { id: { in: zoneIds } },
     });
   }
-
 }

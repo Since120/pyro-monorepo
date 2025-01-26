@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 
 @Controller('categories')
@@ -12,27 +22,44 @@ export class CategoriesController {
       return cats; // Nest.js serialisiert als JSON
     } catch (err) {
       console.error('Fehler in findAll():', err);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
   @Post()
-  async create(@Body() body: { name: string; categoryType: string; isVisible?: boolean }) {
+  async create(
+    @Body() body: { name: string; categoryType: string; isVisible?: boolean },
+  ) {
     if (!body.name || !body.categoryType) {
-      throw new HttpException('name & categoryType required', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'name & categoryType required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     try {
       const newCat = await this.categoriesService.createCategory(body);
       return newCat;
     } catch (err) {
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
   @Patch(':id')
   async update(
     @Param('id') catId: string,
-    @Body() body: { name?: string; categoryType?: string; isVisible?: boolean; allowedRoles?: string[] },
+    @Body()
+    body: {
+      name?: string;
+      categoryType?: string;
+      isVisible?: boolean;
+      allowedRoles?: string[];
+    },
   ) {
     if (!catId) {
       throw new HttpException('Missing categoryId', HttpStatus.BAD_REQUEST);
@@ -41,7 +68,10 @@ export class CategoriesController {
       const updated = await this.categoriesService.updateCategory(catId, body);
       return updated;
     } catch (err) {
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -54,7 +84,10 @@ export class CategoriesController {
       const deleted = await this.categoriesService.deleteCategory(catId);
       return deleted;
     } catch (err) {
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

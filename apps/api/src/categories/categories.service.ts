@@ -5,13 +5,17 @@ import { PrismaClient } from '@prisma/client';
 export class CategoriesService {
   private prisma = new PrismaClient();
 
-  // read all 
+  // read all
   findAll() {
     return this.prisma.category.findMany();
   }
 
   // create
-  async createCategory(data: { name: string; categoryType: string; isVisible?: boolean }) {
+  async createCategory(data: {
+    name: string;
+    categoryType: string;
+    isVisible?: boolean;
+  }) {
     const newCat = await this.prisma.category.create({
       data: {
         name: data.name,
@@ -23,7 +27,15 @@ export class CategoriesService {
   }
 
   // update
-  async updateCategory(catId: string, data: Partial<{ name: string; categoryType: string; isVisible: boolean; allowedRoles: string[] }>) {
+  async updateCategory(
+    catId: string,
+    data: Partial<{
+      name: string;
+      categoryType: string;
+      isVisible: boolean;
+      allowedRoles: string[];
+    }>,
+  ) {
     const updated = await this.prisma.category.update({
       where: { id: catId },
       data,

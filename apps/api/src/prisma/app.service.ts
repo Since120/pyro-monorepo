@@ -11,6 +11,7 @@ export class AppService {
 
   async createUser(name: string) {
     return this.prisma.user.create({
-      data: { username: name }, });
+      data: { username: name },
+    });
   }
 }
