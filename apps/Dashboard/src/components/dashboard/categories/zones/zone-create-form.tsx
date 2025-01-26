@@ -1,3 +1,4 @@
+// apps/Dashboard/src/components/dashboard/categories/zones/zone-create-form.tsx
 "use client";
 
 import * as React from "react";
@@ -16,11 +17,11 @@ interface CategoryOption {
 export function ZoneCreateForm() {
   const router = useRouter();
 
-  // Kategorieliste
+  // 1) Kategorieliste laden
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categoryId, setCategoryId] = useState("");
 
-  // Pflichtfelder
+  // 2) Pflichtfelder
   const [zoneKey, setZoneKey] = useState("");
   const [zoneName, setZoneName] = useState("");
   const [minutesRequired, setMinutesRequired] = useState<number>(60);
@@ -33,14 +34,16 @@ export function ZoneCreateForm() {
   const [errorMinutes, setErrorMinutes] = useState("");
   const [errorPoints, setErrorPoints] = useState("");
 
-  // Kategorien laden
+  // 3) Beim Mount => Kategorien von NestJS holen (z. B. http://localhost:3004/categories)
   useEffect(() => {
     async function loadCategories() {
       try {
-        // In Nest.js-Fall: fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories`);
-        const res = await fetch("/api/categories");
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004";
+        const res = await fetch(`${baseUrl}/categories`, {
+          // GET
+        });
         if (!res.ok) {
-          throw new Error(`Error ${res.status} ${res.statusText}`);
+          throw new Error(`Fehler beim Laden der Kategorien: ${res.status} ${res.statusText}`);
         }
         const data = await res.json();
         const mapped = data.map((cat: any) => ({
@@ -55,9 +58,9 @@ export function ZoneCreateForm() {
     loadCategories();
   }, []);
 
-  // Speichern mit Validierung
+  // 4) Speichern + Validierung
   const handleSave = useCallback(async () => {
-    // 1) Reset aller Errorstates
+    // Reset
     setErrorCategory("");
     setErrorZoneKey("");
     setErrorZoneName("");
@@ -66,42 +69,32 @@ export function ZoneCreateForm() {
 
     let isValid = true;
 
-    // 2) Check: Kategorie (Pflicht)
     if (!categoryId) {
       setErrorCategory("Bitte eine Kategorie auswählen");
       isValid = false;
     }
-
-    // 3) Check: zoneKey
     if (!zoneKey.trim()) {
       setErrorZoneKey("Zone Key ist erforderlich");
       isValid = false;
     }
-
-    // 4) Check: zoneName
     if (!zoneName.trim()) {
       setErrorZoneName("Zonen-Name ist erforderlich");
       isValid = false;
     }
-
-    // 5) Check: Minuten
     if (minutesRequired <= 0) {
       setErrorMinutes("Minuten > 0 erforderlich");
       isValid = false;
     }
-
-    // 6) Check: Punkte
     if (pointsGranted <= 0) {
       setErrorPoints("Punkte > 0 erforderlich");
       isValid = false;
     }
 
-    // Abbrechen, wenn Fehler
     if (!isValid) return;
 
-    // 7) POST-Request
+    // POST zur NestJS-API
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004";
       const response = await fetch(`${baseUrl}/zones`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -115,12 +108,13 @@ export function ZoneCreateForm() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        alert(`Fehler beim Erstellen: ${errData.error ?? response.statusText}`);
+        const errData = await response.json().catch(() => null);
+        const msg = errData?.message || errData?.error || response.statusText;
+        alert(`Fehler beim Erstellen: ${msg}`);
         return;
       }
 
-      // Erfolg
+      // Erfolg => zurück zur Liste
       router.push("/dashboard/categories");
     } catch (error) {
       console.error("handleSave error:", error);
@@ -132,12 +126,12 @@ export function ZoneCreateForm() {
     zoneName,
     minutesRequired,
     pointsGranted,
-    router,
+    router
   ]);
 
   return (
     <Stack spacing={2}>
-      {/* Kategorie-Dropdown als Pflichtfeld */}
+      {/* Kategorie-Dropdown */}
       <TextField
         select
         required
@@ -165,7 +159,6 @@ export function ZoneCreateForm() {
         error={!!errorZoneKey}
         helperText={errorZoneKey}
       />
-
       <TextField
         required
         label="Zone Name"
@@ -174,7 +167,6 @@ export function ZoneCreateForm() {
         error={!!errorZoneName}
         helperText={errorZoneName}
       />
-
       <TextField
         required
         label="Benötigte Minuten"
@@ -184,7 +176,6 @@ export function ZoneCreateForm() {
         error={!!errorMinutes}
         helperText={errorMinutes}
       />
-
       <TextField
         required
         label="Punkte"

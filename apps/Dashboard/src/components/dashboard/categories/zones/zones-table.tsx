@@ -42,9 +42,20 @@ const columns: ColumnDef<ZoneResult>[] = [
     width: "120px",
   },
   {
-    formatter: (row) => row.categoryName ?? "-",
     name: "Kategorie",
     width: "250px",
+    formatter: (row) => {
+      if (!row.categoryName) return "-";
+      // NEU: Prüfen, ob categoryDeletedInDiscord
+      if (row.categoryDeletedInDiscord) {
+        return (
+          <Box sx={{ color: "error.main", fontWeight: "bold" }}>
+            {row.categoryName} (Gelöscht)
+          </Box>
+        );
+      }
+      return row.categoryName;
+    },
   },
   {
     formatter: (row) => {

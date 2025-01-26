@@ -10,5 +10,6 @@ export interface ZoneResult {
     totalSecondsInZone: number;
     categoryName: string | null;
     lastUsage: Date | null;
+    categoryDeletedInDiscord?: boolean;
   }
   

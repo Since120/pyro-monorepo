@@ -1,25 +1,44 @@
-import { Injectable } from '@nestjs/common';
+// apps/api/src/zones/zones.service.ts
+
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common'; // NEU: HttpException import
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class ZonesService {
   private prisma = new PrismaClient();
 
+  // Alle Zonen + Category
   findAll() {
     return this.prisma.zone.findMany({
       include: {
-        category: true, // damit wir categoryName etc. abrufen können
+        category: true,
       },
     });
   }
 
-  createZone(data: {
+  // NEU: Category-Check beim Erstellen
+  async createZone(data: {
     zoneKey: string;
     zoneName: string;
     minutesRequired?: number;
     pointsGranted?: number;
     categoryId?: string | null;
   }) {
+    // 1) Falls categoryId übergeben wurde, check Category exist
+    if (data.categoryId) {
+      const cat = await this.prisma.category.findUnique({
+        where: { id: data.categoryId },
+      });
+      if (!cat) {
+        // => API-Fehler => 400
+        throw new HttpException(
+          'Kann Zone nicht erstellen, da Category nicht existiert.',
+          HttpStatus.BAD_REQUEST
+        );
+      }
+    }
+
+    // 2) Zone anlegen
     return this.prisma.zone.create({
       data: {
         zoneKey: data.zoneKey,
@@ -31,7 +50,8 @@ export class ZonesService {
     });
   }
 
-  updateZone(
+  // Update einer Zone
+  async updateZone(
     zoneId: string,
     data: Partial<{
       zoneKey: string;
@@ -39,8 +59,21 @@ export class ZonesService {
       minutesRequired: number;
       pointsGranted: number;
       categoryId?: string | null;
-    }>,
+    }>
   ) {
+    // Optional: Auch hier checken, ob categoryId existiert
+    if (data.categoryId) {
+      const cat = await this.prisma.category.findUnique({
+        where: { id: data.categoryId },
+      });
+      if (!cat) {
+        throw new HttpException(
+          'Kann Zone nicht updaten, da Category nicht existiert.',
+          HttpStatus.BAD_REQUEST
+        );
+      }
+    }
+
     return this.prisma.zone.update({
       where: { id: zoneId },
       data: {

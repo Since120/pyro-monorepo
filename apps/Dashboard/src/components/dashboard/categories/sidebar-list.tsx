@@ -2,17 +2,31 @@
 "use client";
 
 import * as React from "react";
-import { Box, Typography, Stack, Collapse, Divider, IconButton } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Stack,
+  Collapse,
+  Divider,
+  IconButton,
+  Button,
+} from "@mui/material";
 import type { CategoryItem } from "./types";
 import { NotePencil as NotePencilIcon } from "@phosphor-icons/react/dist/ssr/NotePencil";
 import Link from "next/link";
 
+/** --------------------------
+ * PROPS
+ * -------------------------- */
 interface SidebarListProps {
   categories: CategoryItem[];
   selectedCatId: string | null;
   onSelectCategory: (catId: string | null) => void;
 }
 
+/** --------------------------
+ * SIDEBAR LIST
+ * -------------------------- */
 export function SidebarList({
   categories,
   selectedCatId,
@@ -23,7 +37,6 @@ export function SidebarList({
       {categories.map((cat) => {
         const isSelected = cat.id === selectedCatId;
 
-        // Toggle: Falls schon selbes => schließe (null), sonst => cat.id
         const handleToggle = () => {
           if (isSelected) {
             onSelectCategory(null);
@@ -45,7 +58,9 @@ export function SidebarList({
   );
 }
 
-/** Ein einzelnes List-Item */
+/** --------------------------
+ * EIN EINZELNES ITEM
+ * -------------------------- */
 interface SidebarListItemProps {
   category: CategoryItem;
   selected: boolean;
@@ -53,22 +68,45 @@ interface SidebarListItemProps {
 }
 
 function SidebarListItem({ category, selected, onToggle }: SidebarListItemProps) {
-  // NEU: Prüfen, ob in Discord gelöscht
   const isDeletedInDiscord = category.deletedInDiscord === true;
+
+  // (NEU) Handler: Wiederherstellen
+  const handleRestore = React.useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Kein Toggle
+
+    const confirmed = window.confirm("Wirklich wiederherstellen?");
+    if (!confirmed) return;
+
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(`${baseUrl}/categories/restore/${category.id}`, {
+        method: "PATCH",
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        const msg = errData?.message || errData?.error || res.statusText;
+        alert(`Fehler beim Wiederherstellen: ${msg}`);
+        return;
+      }
+      // Erfolg => Optional: Reload page or refresh data
+      alert("Kategorie wurde wiederhergestellt!");
+      window.location.reload();
+    } catch (error) {
+      console.error("handleRestore error:", error);
+      alert("Unerwarteter Fehler beim Wiederherstellen: " + String(error));
+    }
+  }, [category.id]);
 
   return (
     <Box
-      // NEU: falls `deletedInDiscord` => roten Hintergrund
       sx={{
-        // Eine leichte rote Tönung
         backgroundColor: isDeletedInDiscord ? "rgba(255, 0, 0, 0.08)" : "inherit",
         "&:hover": {
-          // Bei Hover etwas stärker
           backgroundColor: isDeletedInDiscord ? "rgba(255, 0, 0, 0.12)" : "transparent",
         },
       }}
     >
-      {/* Header-Bereich */}
+      {/* Header */}
       <Box
         sx={{
           px: 2,
@@ -81,7 +119,7 @@ function SidebarListItem({ category, selected, onToggle }: SidebarListItemProps)
         }}
         onClick={onToggle}
       >
-        {/* Links: Category Name + Last Used */}
+        {/* Left */}
         <Box>
           <Typography variant="body1" sx={{ fontWeight: 500 }}>
             {category.name}
@@ -92,18 +130,29 @@ function SidebarListItem({ category, selected, onToggle }: SidebarListItemProps)
               : "No usage"}
           </Typography>
 
-          {/* NEU: Info-Text, wenn deletedInDiscord */}
           {isDeletedInDiscord && (
-            <Typography
-              variant="caption"
-              sx={{ color: "error.main", display: "block", fontWeight: "bold" }}
-            >
-              Gelöscht im Discord
-            </Typography>
+            <>
+              <Typography
+                variant="caption"
+                sx={{ color: "error.main", display: "block", fontWeight: "bold" }}
+              >
+                Gelöscht im Discord
+              </Typography>
+              {/* NEU: "Wiederherstellen"-Button */}
+              <Button
+                variant="outlined"
+                color="success"
+                size="small"
+                sx={{ mt: 1 }}
+                onClick={handleRestore}
+              >
+                Wiederherstellen
+              </Button>
+            </>
           )}
         </Box>
 
-        {/* Rechts: Edit-Icon */}
+        {/* Right */}
         <IconButton
           component={Link}
           href={`/dashboard/categories/edit/${category.id}`}
@@ -113,7 +162,7 @@ function SidebarListItem({ category, selected, onToggle }: SidebarListItemProps)
         </IconButton>
       </Box>
 
-      {/* Detail/Collapse */}
+      {/* Detail-Collapse */}
       <Collapse in={selected} unmountOnExit>
         <Box sx={{ px: 2, py: 2 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>

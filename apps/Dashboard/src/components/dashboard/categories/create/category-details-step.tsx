@@ -167,11 +167,13 @@ export function CategoryDetailsStep({
             placeholder="z.B. '═══ Mining 🛠️ ═════════'"
             inputRef={categoryTitleRef}
             defaultValue={name}
-            // => Text groß anzeigen
+            onChange={handleNameChange}
+            // NEU: Hilfstext
+            helperText="Maximal 25 Zeichen. Wird in Discord GROSS geschrieben."
             inputProps={{
               style: { textTransform: "uppercase" },
+              maxLength: 25, // HTML-Attribut, optional
             }}
-            onChange={handleNameChange}
             sx={{ flex: 1 }}
           />
 
@@ -212,10 +214,6 @@ export function CategoryDetailsStep({
             </Popover>
           </Stack>
         </Stack>
-
-        <Typography variant="body2" color="text.secondary" sx={{ mt: -2.5 }}>
-          Hinweis: Kategorien in Discord werden grundsätzlich in GROSSBUCHSTABEN angezeigt.
-        </Typography>
 
         {/* Autocomplete für Tags */}
         <Autocomplete

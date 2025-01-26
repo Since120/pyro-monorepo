@@ -1,3 +1,5 @@
+// KOMPLETTE DATEI: apps/Dashboard/src/components/dashboard/categories/zones/zones-page-client.tsx
+
 "use client";
 
 import * as React from "react";
@@ -16,28 +18,25 @@ import { ZonesPagination } from "./zones-pagination";
 import { ZonesTable } from "./zones-table";
 import type { ZoneResult } from "./types";
 
-// Falls du "paths" nutzt
-import { paths } from "@/paths";
-
-// 1) Wir entfernen Dummy-Zonen und machen realen fetch
 export function ZonesPageClient() {
   const router = useRouter();
   const [zones, setZones] = React.useState<ZoneResult[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Optional: Filter-Parameter per Query (SearchParams)
+  // Such-Parameter aus der URL (optional)
   const searchParams = useSearchParams();
   const zoneKeyParam = searchParams?.get("zoneKey") ?? "";
   const nameParam = searchParams?.get("name") ?? "";
   const sortDir = (searchParams?.get("sortDir") as "asc" | "desc") ?? "desc";
 
-  // 2) Beim Mount => Daten laden (alle Zonen)
+  // 1) Zonen laden
   React.useEffect(() => {
     async function fetchZones() {
       try {
         setLoading(true);
         setError(null);
+
         const baseUrl = process.env.NEXT_PUBLIC_API_URL;
         const res = await fetch(`${baseUrl}/zones`);
         if (!res.ok) {
@@ -45,7 +44,6 @@ export function ZonesPageClient() {
         }
         const data = await res.json();
 
-        // data = Array of { id, zoneKey, zoneName, ... }
         const mapped: ZoneResult[] = data.map((z: any) => ({
           id: z.id,
           zoneKey: z.zoneKey,
@@ -54,11 +52,10 @@ export function ZonesPageClient() {
           pointsGranted: z.pointsGranted,
           totalSecondsInZone: z.totalSecondsInZone ?? 0,
           lastUsage: z.lastUsage ? new Date(z.lastUsage) : null,
-  
-          // Neu: Falls category vorhanden => name
           categoryName: z.category ? z.category.name : null,
+          categoryDeletedInDiscord: z.category ? z.category.deletedInDiscord : false,
         }));
-  
+
         setZones(mapped);
       } catch (err: any) {
         console.error("fetchZones error:", err);
@@ -67,19 +64,16 @@ export function ZonesPageClient() {
         setLoading(false);
       }
     }
-  
+
     fetchZones();
   }, []);
 
-      // 2) Funktion, um gelöschte ZoneIDs aus dem State zu entfernen
-   const handleZonesDeleted = React.useCallback((deletedIds: string[]) => {
-      // Lokal State anpassen => UI sofort aktualisiert
-      setZones((prev) => prev.filter((z) => !deletedIds.includes(z.id)));
-    }, []);
+  // 2) Für Mehrfach-Löschung => Zonen local aus State entfernen
+  const handleZonesDeleted = React.useCallback((deletedIds: string[]) => {
+    setZones((prev) => prev.filter((z) => !deletedIds.includes(z.id)));
+  }, []);
 
-
-  // 3) Filtern + Sortieren (clientseitig)
-  // => Du kannst es wie in der alten Dummy-Logik belassen, falls gewünscht
+  // 3) Filter & Sort (Clientseitig)
   const filtered = React.useMemo(() => {
     return zones.filter((z) => {
       if (zoneKeyParam && !z.zoneKey.toLowerCase().includes(zoneKeyParam.toLowerCase())) {
@@ -99,9 +93,29 @@ export function ZonesPageClient() {
     return [...filtered].sort((a, b) => b.zoneName.localeCompare(a.zoneName));
   }, [filtered, sortDir]);
 
-  // 4) Neue Zone anlegen => ...
-  const handleCreateZone = React.useCallback(() => {
-    router.push("/dashboard/categories/zones/create");
+  // 4) NEUE ZONE ANLEGEN => Vorher checken, ob mind. 1 Kategorie existiert
+  const handleCreateZone = React.useCallback(async () => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      // CATEGORIES abfragen
+      const catRes = await fetch(`${baseUrl}/categories`);
+      if (!catRes.ok) {
+        throw new Error(`Fehler beim Laden der Kategorien (Status ${catRes.status})`);
+      }
+      const catData = await catRes.json();
+
+      // Prüfen, ob catData.length > 0
+      if (!Array.isArray(catData) || catData.length === 0) {
+        alert("Keine Kategorie vorhanden! Lege zuerst eine Kategorie an, bevor du eine Zone erstellst.");
+        return;
+      }
+
+      // Wenn mind. eine Category da ist => zum Create-Form
+      router.push("/dashboard/categories/zones/create");
+    } catch (err: any) {
+      console.error("handleCreateZone error:", err);
+      alert("Fehler beim Prüfen der Kategorien: " + (err.message ?? String(err)));
+    }
   }, [router]);
 
   // 5) Render
@@ -115,7 +129,8 @@ export function ZonesPageClient() {
           sx={{ alignItems: "flex-start", justifyContent: "space-between" }}
         >
           <Typography variant="h4">Zonen Übersicht</Typography>
-          <Button variant="contained" component={Link} href="/dashboard/categories/zones/create">
+          {/* HIER: handleCreateZone statt Link */}
+          <Button variant="contained" onClick={handleCreateZone}>
             Neue Zone anlegen
           </Button>
         </Stack>

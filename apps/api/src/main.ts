@@ -6,7 +6,6 @@ import * as dotenv from 'dotenv';
 import * as dotenvExpand from 'dotenv-expand';
 const env = dotenv.config(); // Laden
 dotenvExpand.expand(env); // Expand
-console.log('DATABASE_URL =>', process.env.DATABASE_URL);
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

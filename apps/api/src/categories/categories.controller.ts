@@ -109,6 +109,25 @@ export class CategoriesController {
       return deleted;
     } catch (err) {
       console.error('Fehler in remove():', err);
+  
+      // NEU: Wenn es schon eine HttpException ist, re-throw sie
+      if (err instanceof HttpException) {
+        throw err;
+      }
+  
+      // Sonst: 500
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+  @Patch('restore/:id')
+  async restoreCategoryInDiscord(@Param('id') catId: string) {
+    try {
+      const result = await this.categoriesService.restoreCategoryInDiscord(catId);
+      return { ok: true, data: result };
+    } catch (err) {
+      console.error('Fehler in restoreCategoryInDiscord:', err);
+
+      if (err instanceof HttpException) throw err;
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

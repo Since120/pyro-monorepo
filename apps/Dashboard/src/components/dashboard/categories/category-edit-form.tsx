@@ -172,25 +172,31 @@ export function CategoryEditForm({ category }: CategoryEditFormProps) {
 
   // Handler: Löschen
   const handleDelete = useCallback(async () => {
-    if (!window.confirm("Wirklich löschen?")) return;
-  
+    const confirmed = window.confirm("Wirklich löschen?");
+    if (!confirmed) return;
+
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL;
       const res = await fetch(`${baseUrl}/categories/${category.id}`, {
-      method: "DELETE",
+        method: "DELETE",
       });
+
       if (!res.ok) {
-        const errData = await res.json();
-        alert(`Fehler beim Löschen: ${errData.error ?? res.statusText}`);
+        // NEU: Fehlermeldung parsen
+        const errData = await res.json().catch(() => null);
+        // Falls JSON parse schief geht, fallback: res.statusText
+        const msg = errData?.message || errData?.error || res.statusText;
+        alert(`Fehler beim Löschen: ${msg}`);
         return;
       }
-  
+
       router.push("/dashboard/categories");
     } catch (err) {
       console.error("handleDelete error:", err);
       alert("Fehler beim Löschen: " + String(err));
     }
   }, [category.id, router]);
+
   
   
 
@@ -286,8 +292,17 @@ export function CategoryEditForm({ category }: CategoryEditFormProps) {
             name="categoryTitle"
             placeholder="z.B. '═══ Mining 🛠️ ═════════'"
             value={name}
-            onChange={(e) => setName(e.target.value.toUpperCase())}
+            onChange={(e) => {
+              // 1) uppercase
+              let newVal = e.target.value.toUpperCase();
+              // 2) max 40 Zeichen
+              if (newVal.length > 25) {
+                newVal = newVal.slice(0, 25);
+              }
+              setName(newVal);
+            }}
             inputProps={{
+              maxLength: 25,         // HTML5-Attribute
               style: { textTransform: "uppercase" },
             }}
             sx={{ flex: 1 }}
