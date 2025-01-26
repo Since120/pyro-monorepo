@@ -1,5 +1,5 @@
-import { prisma } from './dbClient';
-import logger from './logger';
+import { prisma } from "./dbClient";
+import logger from "./logger";
 
 /**
  * Legt einen neuen Datensatz in DynamicVoiceChannel an (DB).

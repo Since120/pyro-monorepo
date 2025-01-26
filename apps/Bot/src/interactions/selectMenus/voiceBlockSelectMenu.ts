@@ -1,7 +1,7 @@
 // src/bot/interactions/selectMenus/voiceBlockSelectMenu.ts
 
-import { UserSelectMenuInteraction } from 'discord.js';
-import { prisma } from '../../services/dbClient';
+import { UserSelectMenuInteraction } from "discord.js";
+import { prisma } from "../../services/dbClient";
 
 export async function handleVoiceBlockSelect(interaction: UserSelectMenuInteraction) {
   try {
@@ -9,14 +9,14 @@ export async function handleVoiceBlockSelect(interaction: UserSelectMenuInteract
 
     const guild = interaction.guild;
     if (!guild) {
-      return interaction.followUp({ content: 'Fehler: Keine Guild.', ephemeral: true });
+      return interaction.followUp({ content: "Fehler: Keine Guild.", ephemeral: true });
     }
 
     const member = await guild.members.fetch(interaction.user.id);
     const voiceChannel = member.voice.channel;
     if (!voiceChannel) {
       return interaction.followUp({
-        content: 'Du bist in keinem Voice-Kanal.',
+        content: "Du bist in keinem Voice-Kanal.",
         ephemeral: true,
       });
     }
@@ -27,13 +27,13 @@ export async function handleVoiceBlockSelect(interaction: UserSelectMenuInteract
     });
     if (!dynamicChannel) {
       return interaction.followUp({
-        content: 'Dies ist kein dynamischer Kanal.',
+        content: "Dies ist kein dynamischer Kanal.",
         ephemeral: true,
       });
     }
     if (dynamicChannel.createdByUser !== interaction.user.id) {
       return interaction.followUp({
-        content: 'Nur der Ersteller darf User blocken!',
+        content: "Nur der Ersteller darf User blocken!",
         ephemeral: true,
       });
     }
@@ -50,7 +50,7 @@ export async function handleVoiceBlockSelect(interaction: UserSelectMenuInteract
     let newAllowed = [...oldAllowed];
     for (const blockedId of selectedUserIds) {
       if (newAllowed.includes(blockedId)) {
-        newAllowed = newAllowed.filter(u => u !== blockedId);
+        newAllowed = newAllowed.filter((u) => u !== blockedId);
       }
     }
 
@@ -75,21 +75,20 @@ export async function handleVoiceBlockSelect(interaction: UserSelectMenuInteract
         //   await blockedMember.voice.disconnect();
         // }
       } catch (err) {
-        console.error('Fehler beim Overwrite (block):', err);
+        console.error("Fehler beim Overwrite (block):", err);
       }
     }
 
     return interaction.followUp({
-      content: `Folgende User wurden blockiert:\n`
-        + selectedUserIds.map(id => `<@${id}>`).join(', '),
+      content:
+        `Folgende User wurden blockiert:\n` + selectedUserIds.map((id) => `<@${id}>`).join(", "),
       ephemeral: true,
     });
-
   } catch (err) {
-    console.error('handleVoiceBlockSelect Fehler:', err);
+    console.error("handleVoiceBlockSelect Fehler:", err);
     try {
       return interaction.followUp({
-        content: 'Ein Fehler ist aufgetreten beim Blocken.',
+        content: "Ein Fehler ist aufgetreten beim Blocken.",
         ephemeral: true,
       });
     } catch {

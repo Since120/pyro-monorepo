@@ -27,7 +27,7 @@ model Category {
   updatedAt           DateTime @default(now()) @updatedAt
   zones               Zone[]
   discordCategoryId   String?
-
+  deletedInDiscord    Boolean  @default(false)
 }
 
 

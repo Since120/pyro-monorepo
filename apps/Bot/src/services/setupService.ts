@@ -1,6 +1,6 @@
 // --- src/bot/services/setupService.ts ---
-import { PrismaClient } from '@prisma/client';
-import logger from './logger';
+import { PrismaClient } from "@prisma/client";
+import logger from "./logger";
 
 const prisma = new PrismaClient();
 
@@ -22,10 +22,10 @@ export async function saveSetupChannels(
     `saveSetupChannels: category=${categoryId}, text=${textChannelId}, voice=${voiceChannelId}`
   );
 
-  // Wir tun so, als gäbe es nur EINEN Datensatz (id=1) oder so – 
-  // Du kannst natürlich auch eine ID generieren oder 
+  // Wir tun so, als gäbe es nur EINEN Datensatz (id=1) oder so –
+  // Du kannst natürlich auch eine ID generieren oder
   // das Ganze anders lösen. Hier Minimalbeispiel:
-  const recordId = 'setup-record';
+  const recordId = "setup-record";
 
   const result = await prisma.setupChannels.upsert({
     where: { id: recordId },
@@ -51,7 +51,7 @@ export async function saveSetupChannels(
  */
 export async function getSetupChannels() {
   // Gleiche Logik: wir haben nur ein "setup-record"
-  const recordId = 'setup-record';
+  const recordId = "setup-record";
 
   const found = await prisma.setupChannels.findUnique({
     where: { id: recordId },
@@ -63,10 +63,10 @@ export async function getSetupChannels() {
  * Löscht den SetupChannels-Eintrag komplett.
  */
 export async function deleteSetupChannels() {
-  const recordId = 'setup-record';
+  const recordId = "setup-record";
   await prisma.setupChannels.delete({ where: { id: recordId } }).catch((err) => {
     // catch: Falls nicht existiert, ignorieren
     logger.warn(`deleteSetupChannels: Kein Datensatz gefunden? ${err}`);
   });
-  logger.info('SetupChannels-Eintrag gelöscht (falls vorhanden).');
+  logger.info("SetupChannels-Eintrag gelöscht (falls vorhanden).");
 }

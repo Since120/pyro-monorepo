@@ -6,45 +6,41 @@ import {
   ChannelType,
   PermissionFlagsBits,
   CategoryChannel,
-} from 'discord.js';
-import logger from '../../services/logger';
-import { getSetupChannels, deleteSetupChannels, saveSetupChannels } from '../../services/setupService';
-import { prisma } from '../../services/dbClient';
+} from "discord.js";
+import logger from "../../services/logger";
+import {
+  getSetupChannels,
+  deleteSetupChannels,
+  saveSetupChannels,
+} from "../../services/setupService";
+import { prisma } from "../../services/dbClient";
 
 /**
- * Merged Code: 
+ * Merged Code:
  *  1) Lässt dich eine Kategorie wählen.
  *  2) Speichert die Category-ID in adminSettings (voiceCategoryId).
- *  3) Löscht (falls vorhanden) alte Channels (Text/Voice), 
+ *  3) Löscht (falls vorhanden) alte Channels (Text/Voice),
  *  4) Erstellt neue Kanäle (Text + Voice) und speichert sie in SetupChannels.
  */
 export const data = new SlashCommandBuilder()
-  .setName('kategorie_setup')
-  .setDescription(
-    'Erstelle in einer gewählten Kategorie automatisch einen Text- & Voice-Channel.'
-  )
+  .setName("kategorie_setup")
+  .setDescription("Erstelle in einer gewählten Kategorie automatisch einen Text- & Voice-Channel.")
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   // 1) Kategorie (Pflicht)
   .addChannelOption((option) =>
     option
-      .setName('kategorie')
-      .setDescription('Wähle die Kategorie für die neuen Kanäle.')
+      .setName("kategorie")
+      .setDescription("Wähle die Kategorie für die neuen Kanäle.")
       .addChannelTypes(ChannelType.GuildCategory)
       .setRequired(true)
   )
   // 2) Textkanal-Name
   .addStringOption((option) =>
-    option
-      .setName('textchannel_name')
-      .setDescription('Name des Textkanals')
-      .setRequired(true)
+    option.setName("textchannel_name").setDescription("Name des Textkanals").setRequired(true)
   )
   // 3) Voicekanal-Name
   .addStringOption((option) =>
-    option
-      .setName('voicechannel_name')
-      .setDescription('Name des Voicekanals')
-      .setRequired(true)
+    option.setName("voicechannel_name").setDescription("Name des Voicekanals").setRequired(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -52,20 +48,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const guild = interaction.guild;
     if (!guild) {
       return interaction.reply({
-        content: 'Fehler: Dieser Befehl kann nur innerhalb einer Gilde verwendet werden!',
+        content: "Fehler: Dieser Befehl kann nur innerhalb einer Gilde verwendet werden!",
         ephemeral: true,
       });
     }
 
     // Ausgelesene Optionen
-    const categoryChannel = interaction.options.getChannel('kategorie', true);
-    const textName = interaction.options.getString('textchannel_name', true);
-    const voiceName = interaction.options.getString('voicechannel_name', true);
+    const categoryChannel = interaction.options.getChannel("kategorie", true);
+    const textName = interaction.options.getString("textchannel_name", true);
+    const voiceName = interaction.options.getString("voicechannel_name", true);
 
     // Prüfen, ob der Channel wirklich eine Kategorie ist
     if (categoryChannel.type !== ChannelType.GuildCategory) {
       return interaction.reply({
-        content: 'Bitte wähle **eine Kategorie** aus.',
+        content: "Bitte wähle **eine Kategorie** aus.",
         ephemeral: true,
       });
     }
@@ -77,12 +73,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       try {
         const oldTextChannel = await guild.channels.fetch(oldSetup.textChannelId).catch(() => null);
         if (oldTextChannel) {
-          await oldTextChannel.delete('Kategorie-Setup: Alte Textchannel entfernen');
+          await oldTextChannel.delete("Kategorie-Setup: Alte Textchannel entfernen");
           logger.info(`Alter Textkanal (${oldSetup.textChannelId}) gelöscht.`);
         }
-        const oldVoiceChannel = await guild.channels.fetch(oldSetup.voiceChannelId).catch(() => null);
+        const oldVoiceChannel = await guild.channels
+          .fetch(oldSetup.voiceChannelId)
+          .catch(() => null);
         if (oldVoiceChannel) {
-          await oldVoiceChannel.delete('Kategorie-Setup: Alte Voicechannel entfernen');
+          await oldVoiceChannel.delete("Kategorie-Setup: Alte Voicechannel entfernen");
           logger.info(`Alter Voicekanal (${oldSetup.voiceChannelId}) gelöscht.`);
         }
       } catch (err) {
@@ -98,14 +96,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       name: textName,
       type: ChannelType.GuildText,
       parent: categoryChannel.id,
-      reason: 'Kategorie-Setup: Neuer Textkanal',
+      reason: "Kategorie-Setup: Neuer Textkanal",
     });
 
     const createdVoice = await guild.channels.create({
       name: voiceName,
       type: ChannelType.GuildVoice,
       parent: categoryChannel.id,
-      reason: 'Kategorie-Setup: Neuer Voicekanal',
+      reason: "Kategorie-Setup: Neuer Voicekanal",
     });
 
     // 5) DB: Neuer SetupChannels-Eintrag
@@ -135,7 +133,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       ephemeral: true,
     });
   } catch (error) {
-    logger.error('Fehler bei /kategorie_setup:', error);
+    logger.error("Fehler bei /kategorie_setup:", error);
     // NEU: Hier nur den Catch anpassen
     if (interaction.deferred || interaction.replied) {
       await interaction.followUp({

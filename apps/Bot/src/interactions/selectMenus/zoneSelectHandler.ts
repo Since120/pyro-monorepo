@@ -6,23 +6,23 @@ import {
   StringSelectMenuInteraction,
   ChannelType,
   PermissionsBitField,
-} from 'discord.js';
-import logger from '../../services/logger';
-import { getAllZones } from '../../services/zoneService'; 
-import { sessionData } from '../../interaction_handlers/modalInteractions'; 
-import { createDynamicChannel } from '../../services/dynamicChannelService'; 
-import { getRoleConfigByKey } from '../../services/roleConfigService';
-import { prisma } from '../../services/dbClient';  // Hier anpassen
+} from "discord.js";
+import logger from "../../services/logger";
+import { getAllZones } from "../../services/zoneService";
+import { sessionData } from "../../interaction_handlers/modalInteractions";
+import { createDynamicChannel } from "../../services/dynamicChannelService";
+import { getRoleConfigByKey } from "../../services/roleConfigService";
+import { prisma } from "../../services/dbClient"; // Hier anpassen
 
 export async function buildZoneSelectMenu(customId: string) {
   const zones = await getAllZones();
   if (!zones.length) {
-    throw new Error('Keine Zonen definiert. Nutze /zone_einrichten zuerst!');
+    throw new Error("Keine Zonen definiert. Nutze /zone_einrichten zuerst!");
   }
 
   const select = new StringSelectMenuBuilder()
     .setCustomId(customId)
-    .setPlaceholder('Wähle eine Zone ...');
+    .setPlaceholder("Wähle eine Zone ...");
 
   const options = zones.map((z) => ({
     label: z.zoneName,
@@ -40,23 +40,23 @@ export async function handleZoneSelect(interaction: StringSelectMenuInteraction)
   const userId = interaction.user.id;
   const guild = interaction.guild;
   if (!guild) {
-    return interaction.reply({ content: 'Fehler: Keine Guild.', ephemeral: true });
+    return interaction.reply({ content: "Fehler: Keine Guild.", ephemeral: true });
   }
 
   const data = sessionData.get(userId);
   if (!data || !data.channelName) {
-    return interaction.reply({ content: 'Fehler: Kein Kanalname gefunden.', ephemeral: true });
+    return interaction.reply({ content: "Fehler: Kein Kanalname gefunden.", ephemeral: true });
   }
   const channelName = data.channelName;
 
   const finalName = `${zoneKey} - ${channelName}`;
-  const freigabeConfig = await getRoleConfigByKey('freigabe');
+  const freigabeConfig = await getRoleConfigByKey("freigabe");
   const freigabeRoleId = freigabeConfig?.roleId;
 
   const settings = await prisma.adminSettings.findFirst();
   if (!settings || !settings.voiceCategoryId) {
     return interaction.reply({
-      content: 'Keine Kategorie definiert. Nutze /kategorie_setup!',
+      content: "Keine Kategorie definiert. Nutze /kategorie_setup!",
       ephemeral: true,
     });
   }
@@ -84,7 +84,7 @@ export async function handleZoneSelect(interaction: StringSelectMenuInteraction)
           ]
         : []),
     ],
-    reason: 'Dynamischer Voice-Kanal',
+    reason: "Dynamischer Voice-Kanal",
   });
 
   await createDynamicChannel(created.id, zoneKey, userId);
@@ -94,7 +94,7 @@ export async function handleZoneSelect(interaction: StringSelectMenuInteraction)
     try {
       await member.voice.setChannel(created.id);
     } catch (err) {
-      logger.warn('Fehler beim Verschieben:', err);
+      logger.warn("Fehler beim Verschieben:", err);
     }
   }
 

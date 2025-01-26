@@ -1,13 +1,13 @@
 // src/bot/events/voiceStateUpdate.ts
 
-import { VoiceState } from 'discord.js';
-import { getDynamicChannelById, deleteDynamicChannel } from '../services/dynamicChannelService';
-import logger from '../services/logger';
-import { getRoleConfigByKey } from '../services/roleConfigService';
-import { prisma } from '../services/dbClient'; // Wir löschen userTracking-Eintrag
+import { VoiceState } from "discord.js";
+import { getDynamicChannelById, deleteDynamicChannel } from "../services/dynamicChannelService";
+import logger from "../services/logger";
+import { getRoleConfigByKey } from "../services/roleConfigService";
+import { prisma } from "../services/dbClient"; // Wir löschen userTracking-Eintrag
 
 // NEU:
-import { trackTimeOnChannelLeave, handleNewChannelJoin } from '../services/zoneTrackingHelper';
+import { trackTimeOnChannelLeave, handleNewChannelJoin } from "../services/zoneTrackingHelper";
 
 export default async function voiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
   const member = oldState.member || newState.member;
@@ -16,14 +16,14 @@ export default async function voiceStateUpdate(oldState: VoiceState, newState: V
   // 1) Kanal-Wechsel -> check ob alter Kanal leer => löschen
   if (oldState.channelId && oldState.channelId !== newState.channelId) {
     const oldChannel = oldState.channel;
-    
+
     // NEU: erst Zeit abrechnen
     await trackTimeOnChannelLeave(member, oldState.channelId);
-  
+
     if (oldChannel && oldChannel.members.size === 0) {
       const dyn = await getDynamicChannelById(oldChannel.id);
       if (dyn) {
-        await oldChannel.delete('Dynamischer Kanal leer');
+        await oldChannel.delete("Dynamischer Kanal leer");
         await deleteDynamicChannel(oldChannel.id);
         logger.info(`Dynamischer VoiceKanal gelöscht: ${oldChannel.name}`);
       }
@@ -34,7 +34,11 @@ export default async function voiceStateUpdate(oldState: VoiceState, newState: V
   if (oldState.channelId && !newState.channelId) {
     // user hat voice komplett verlassen
     await checkAndRemoveFreigabeIfNoChannel(member);
-  } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+  } else if (
+    oldState.channelId &&
+    newState.channelId &&
+    oldState.channelId !== newState.channelId
+  ) {
     // user wechselt -> check ob user noch in dynamic channel?
     await checkAndRemoveFreigabeIfNoChannel(member);
   }
@@ -69,7 +73,7 @@ async function checkAndRemoveFreigabeIfNoChannel(member: any) {
 }
 
 async function removeFreigabeRoleAndCleanOverwrites(member: any) {
-  const rc = await getRoleConfigByKey('freigabe');
+  const rc = await getRoleConfigByKey("freigabe");
   if (!rc) return;
 
   if (!member.roles.cache.has(rc.roleId)) {
@@ -94,7 +98,7 @@ async function removeFreigabeRoleAndCleanOverwrites(member: any) {
   // Overwrites in allen dynamischen Kanälen entfernen
   const settings = await prisma.adminSettings.findFirst();
   if (!settings || !settings.voiceCategoryId) {
-    logger.warn('Keine voiceCategoryId definiert, kann Overwrites nicht entfernen.');
+    logger.warn("Keine voiceCategoryId definiert, kann Overwrites nicht entfernen.");
     return;
   }
 

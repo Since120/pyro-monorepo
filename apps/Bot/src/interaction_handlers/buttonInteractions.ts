@@ -5,19 +5,19 @@ import {
   ButtonStyle,
   GuildMember,
   Guild,
-} from 'discord.js';
-import logger from '../services/logger';
-import { getRoleConfigByKey } from '../services/roleConfigService';
-import { prisma } from '../services/dbClient';
-import { showChannelNameModal } from '../interactions/modals/channelNameModal';
+} from "discord.js";
+import logger from "../services/logger";
+import { getRoleConfigByKey } from "../services/roleConfigService";
+import { prisma } from "../services/dbClient";
+import { showChannelNameModal } from "../interactions/modals/channelNameModal";
 
 // NEU importieren
-import { voiceSettingsOpen } from '../interactions/buttons/voiceSettings/voiceSettingsOpen';
-import { voiceSettingA } from '../interactions/buttons/voiceSettings/voiceSettingumbennen';
-import { voiceSettingB } from '../interactions/buttons/voiceSettings/voiceSettingLimits';
-import { voiceSettingC } from '../interactions/buttons/voiceSettings/voiceSettingClose';
-import { voiceSettingD } from '../interactions/buttons/voiceSettings/voiceSettingUserAllow';
-import { voiceSettingE } from '../interactions/buttons/voiceSettings/voiceSettingBlock';
+import { voiceSettingsOpen } from "../interactions/buttons/voiceSettings/voiceSettingsOpen";
+import { voiceSettingA } from "../interactions/buttons/voiceSettings/voiceSettingumbennen";
+import { voiceSettingB } from "../interactions/buttons/voiceSettings/voiceSettingLimits";
+import { voiceSettingC } from "../interactions/buttons/voiceSettings/voiceSettingClose";
+import { voiceSettingD } from "../interactions/buttons/voiceSettings/voiceSettingUserAllow";
+import { voiceSettingE } from "../interactions/buttons/voiceSettings/voiceSettingBlock";
 
 /**
  * Haupt-Dispatcher für alle Button-Clicks.
@@ -26,35 +26,32 @@ export async function handleButton(interaction: ButtonInteraction) {
   const customId = interaction.customId;
   logger.info(`Button geklickt: ${customId}, von ${interaction.user.tag}`);
 
-  if (customId === 'setup_button') {
+  if (customId === "setup_button") {
     return handleSetupButton(interaction);
-  } else if (
-    customId === 'freigabe_aktivieren' ||
-    customId === 'freigabe_deaktivieren'
-  ) {
+  } else if (customId === "freigabe_aktivieren" || customId === "freigabe_deaktivieren") {
     return handleFreigabeChoice(interaction, customId);
-  } else if (customId === 'voice_choice_create') {
+  } else if (customId === "voice_choice_create") {
     return handleVoiceCreate(interaction);
 
-  // NEU: Voice Settings Haupt-Button
-  } else if (customId === 'voice_settings') {
+    // NEU: Voice Settings Haupt-Button
+  } else if (customId === "voice_settings") {
     return voiceSettingsOpen(interaction);
 
-  // NEU: 4 Buttons (A, B, C, D)
-  } else if (customId === 'voice_setting_A') {
+    // NEU: 4 Buttons (A, B, C, D)
+  } else if (customId === "voice_setting_A") {
     return voiceSettingA(interaction);
-  } else if (customId === 'voice_setting_B') {
+  } else if (customId === "voice_setting_B") {
     return voiceSettingB(interaction);
-  } else if (customId === 'voice_setting_C') {
+  } else if (customId === "voice_setting_C") {
     return voiceSettingC(interaction);
-  } else if (customId === 'voice_setting_D') {
+  } else if (customId === "voice_setting_D") {
     return voiceSettingD(interaction);
-  } else if (customId === 'voice_setting_E') {
+  } else if (customId === "voice_setting_E") {
     return voiceSettingE(interaction);
   }
 
   return interaction.reply({
-    content: 'Unbekannter Button.',
+    content: "Unbekannter Button.",
     ephemeral: true,
   });
 }
@@ -69,19 +66,19 @@ async function handleSetupButton(interaction: ButtonInteraction) {
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId('freigabe_aktivieren')
-      .setLabel('Tracking aktivieren')
+      .setCustomId("freigabe_aktivieren")
+      .setLabel("Tracking aktivieren")
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
-      .setCustomId('freigabe_deaktivieren')
-      .setLabel('Tracking deaktivieren')
+      .setCustomId("freigabe_deaktivieren")
+      .setLabel("Tracking deaktivieren")
       .setStyle(ButtonStyle.Danger)
   );
 
   await interaction.reply({
     content:
-      'Möchtest du das Tracking aktivieren oder deaktivieren?\n' +
-      '(Die Freigabe-Rolle zum Betreten aller Kanäle dieser Kategorie bekommst du **in beiden Fällen**.)',
+      "Möchtest du das Tracking aktivieren oder deaktivieren?\n" +
+      "(Die Freigabe-Rolle zum Betreten aller Kanäle dieser Kategorie bekommst du **in beiden Fällen**.)",
     components: [row],
     ephemeral: true,
   });
@@ -100,16 +97,16 @@ async function handleFreigabeChoice(interaction: ButtonInteraction, mode: string
   const guild = interaction.guild;
   if (!guild) {
     return interaction.reply({
-      content: 'Fehler: Nur in einer Gilde nutzbar.',
+      content: "Fehler: Nur in einer Gilde nutzbar.",
       ephemeral: true,
     });
   }
 
   // Hole die definierte Freigabe-Rolle (Setup via /role_freigabe_setup)
-  const freigabeConfig = await getRoleConfigByKey('freigabe');
+  const freigabeConfig = await getRoleConfigByKey("freigabe");
   if (!freigabeConfig) {
     return interaction.reply({
-      content: 'Keine Freigabe-Rolle eingerichtet. Nutze /role_freigabe_setup!',
+      content: "Keine Freigabe-Rolle eingerichtet. Nutze /role_freigabe_setup!",
       ephemeral: true,
     });
   }
@@ -122,12 +119,11 @@ async function handleFreigabeChoice(interaction: ButtonInteraction, mode: string
     logger.info(`Freigabe-Rolle an ${member.user.tag} vergeben.`);
 
     // 2.2) isTracked in DB setzen => true, wenn 'freigabe_aktivieren', false wenn 'freigabe_deaktivieren'
-    const setTracked = (mode === 'freigabe_aktivieren');
+    const setTracked = mode === "freigabe_aktivieren";
     await upsertUserTrackedStatus(member.id, setTracked);
 
     // 2.3) NEU: Overwrites für Kanäle, in denen dieser User in allowedUsers steht
     await applyAllowedUserOverwrites(member, guild);
-
   } catch (err) {
     logger.warn(`Fehler bei Freigabe-Aktion:`, err);
   }
@@ -135,8 +131,8 @@ async function handleFreigabeChoice(interaction: ButtonInteraction, mode: string
   // Nächster Button: "Neuen Voice-Kanal erstellen"
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId('voice_choice_create')
-      .setLabel('Neuen Voice-Kanal erstellen')
+      .setCustomId("voice_choice_create")
+      .setLabel("Neuen Voice-Kanal erstellen")
       .setStyle(ButtonStyle.Secondary)
   );
 
@@ -168,7 +164,7 @@ async function ensureUserInDefinedCategory(interaction: ButtonInteraction): Prom
   const guild = interaction.guild;
   if (!guild) {
     await interaction.reply({
-      content: 'Fehler: Nur in einer Gilde nutzbar.',
+      content: "Fehler: Nur in einer Gilde nutzbar.",
       ephemeral: true,
     });
     return false;
@@ -177,8 +173,7 @@ async function ensureUserInDefinedCategory(interaction: ButtonInteraction): Prom
   const member = await guild.members.fetch(interaction.user.id);
   if (!member.voice.channel) {
     await interaction.reply({
-      content:
-        'Bitte tritt zuerst einem Voice-Kanal dieser Kategorie bei (z.B. Wartekanal).',
+      content: "Bitte tritt zuerst einem Voice-Kanal dieser Kategorie bei (z.B. Wartekanal).",
       ephemeral: true,
     });
     return false;
@@ -188,7 +183,7 @@ async function ensureUserInDefinedCategory(interaction: ButtonInteraction): Prom
   const settings = await prisma.adminSettings.findFirst();
   if (!settings || !settings.voiceCategoryId) {
     await interaction.reply({
-      content: 'Keine Voice-Kategorie definiert. Nutze /kategorie_setup!',
+      content: "Keine Voice-Kategorie definiert. Nutze /kategorie_setup!",
       ephemeral: true,
     });
     return false;

@@ -1,4 +1,4 @@
-import { Client, Collection } from 'discord.js';
+import { Client, Collection } from "discord.js";
 
 /**
  * Ein minimaler TypeScript-Typ für unser 'command' Objekt.
@@ -6,7 +6,7 @@ import { Client, Collection } from 'discord.js';
  * z.B. eine data-Eigenschaft (SlashCommandBuilder) und eine execute-Funktion haben.
  */
 export interface BotCommand {
-  data: any;       // z.B. SlashCommandBuilder
+  data: any; // z.B. SlashCommandBuilder
   execute: Function; // z.B. (interaction) => Promise<void>
 }
 

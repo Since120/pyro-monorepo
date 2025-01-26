@@ -1,8 +1,8 @@
 // src/bot/services/zoneService.ts
 
-import { Zone } from '@prisma/client';
-import { prisma } from './dbClient';
-import logger from './logger';
+import { Zone } from "@prisma/client";
+import { prisma } from "./dbClient";
+import logger from "./logger";
 
 /**
  * Erstellt oder aktualisiert eine Zone
@@ -13,22 +13,24 @@ export async function createOrUpdateZone(
   minutesRequired: number,
   pointsGranted: number
 ): Promise<Zone> {
-  logger.info(`createOrUpdateZone: zoneKey="${zoneKey}", zoneName="${zoneName}", ` +
-              `minutesRequired=${minutesRequired}, pointsGranted=${pointsGranted}`);
+  logger.info(
+    `createOrUpdateZone: zoneKey="${zoneKey}", zoneName="${zoneName}", ` +
+      `minutesRequired=${minutesRequired}, pointsGranted=${pointsGranted}`
+  );
 
   // Zone suchen
   let zone = await prisma.zone.findUnique({ where: { zoneKey } });
   if (!zone) {
     // Neue Zone anlegen
     zone = await prisma.zone.create({
-      data: { zoneKey, zoneName, minutesRequired, pointsGranted }
+      data: { zoneKey, zoneName, minutesRequired, pointsGranted },
     });
     logger.info(`Zone "${zoneKey}" neu erstellt.`);
   } else {
     // Existierende Zone aktualisieren
     zone = await prisma.zone.update({
       where: { zoneKey },
-      data: { zoneName, minutesRequired, pointsGranted }
+      data: { zoneName, minutesRequired, pointsGranted },
     });
     logger.info(`Zone "${zoneKey}" aktualisiert.`);
   }

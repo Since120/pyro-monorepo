@@ -33,3 +33,12 @@ pnpm studio
     ´´´´bash
     git pull
     (holt den aktuellen zustand)
+
+
+
+
+##  Typescript
+
+1.  **Neu ladne**
+    F1
+    Developer: Reload Window

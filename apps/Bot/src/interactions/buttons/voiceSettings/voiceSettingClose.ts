@@ -1,12 +1,12 @@
-import { ButtonInteraction, PermissionOverwrites } from 'discord.js';
-import { prisma } from '../../../services/dbClient';
-import { getRoleConfigByKey } from '../../../services/roleConfigService';
+import { ButtonInteraction, PermissionOverwrites } from "discord.js";
+import { prisma } from "../../../services/dbClient";
+import { getRoleConfigByKey } from "../../../services/roleConfigService";
 
 export async function voiceSettingC(interaction: ButtonInteraction) {
   const guild = interaction.guild;
   if (!guild) {
     return interaction.reply({
-      content: 'Fehler: Dieser Befehl kann nur in einer Gilde ausgeführt werden.',
+      content: "Fehler: Dieser Befehl kann nur in einer Gilde ausgeführt werden.",
       ephemeral: true,
     });
   }
@@ -15,7 +15,7 @@ export async function voiceSettingC(interaction: ButtonInteraction) {
   const voiceChannel = member.voice.channel;
   if (!voiceChannel) {
     return interaction.reply({
-      content: 'Du bist nicht in einem Voice-Kanal. Bitte wechsle in deinen Kanal.',
+      content: "Du bist nicht in einem Voice-Kanal. Bitte wechsle in deinen Kanal.",
       ephemeral: true,
     });
   }
@@ -27,7 +27,7 @@ export async function voiceSettingC(interaction: ButtonInteraction) {
 
   if (!dynamicChannel) {
     return interaction.reply({
-      content: 'Dies ist kein dynamischer Kanal (oder nicht vom Bot verwaltet).',
+      content: "Dies ist kein dynamischer Kanal (oder nicht vom Bot verwaltet).",
       ephemeral: true,
     });
   }
@@ -35,16 +35,16 @@ export async function voiceSettingC(interaction: ButtonInteraction) {
   // Prüfen, ob der aktuelle User der Ersteller ist
   if (dynamicChannel.createdByUser !== interaction.user.id) {
     return interaction.reply({
-      content: 'Nur der Ersteller dieses Kanals darf den Kanal schließen.',
+      content: "Nur der Ersteller dieses Kanals darf den Kanal schließen.",
       ephemeral: true,
     });
   }
 
   // Freigabe-Rolle aus DB holen
-  const freigabeConfig = await getRoleConfigByKey('freigabe');
+  const freigabeConfig = await getRoleConfigByKey("freigabe");
   if (!freigabeConfig) {
     return interaction.reply({
-      content: 'Keine Freigabe-Rolle konfiguriert. Bitte /role_freigabe_setup ausführen!',
+      content: "Keine Freigabe-Rolle konfiguriert. Bitte /role_freigabe_setup ausführen!",
       ephemeral: true,
     });
   }
@@ -66,13 +66,13 @@ export async function voiceSettingC(interaction: ButtonInteraction) {
     });
 
     return interaction.reply({
-      content: 'Kanal wurde geschlossen. Mitglieder mit Freigabe-Rolle können nicht mehr joinen.',
+      content: "Kanal wurde geschlossen. Mitglieder mit Freigabe-Rolle können nicht mehr joinen.",
       ephemeral: true,
     });
   } catch (err) {
-    console.error('Fehler beim Schließen des Kanals:', err);
+    console.error("Fehler beim Schließen des Kanals:", err);
     return interaction.reply({
-      content: 'Konnte den Kanal nicht schließen.',
+      content: "Konnte den Kanal nicht schließen.",
       ephemeral: true,
     });
   }

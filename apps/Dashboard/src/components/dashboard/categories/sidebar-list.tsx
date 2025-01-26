@@ -4,18 +4,12 @@
 import * as React from "react";
 import { Box, Typography, Stack, Collapse, Divider, IconButton } from "@mui/material";
 import type { CategoryItem } from "./types";
-// NEU: Pencil-Icon import
 import { NotePencil as NotePencilIcon } from "@phosphor-icons/react/dist/ssr/NotePencil";
-import Link from "next/link"; // um den IconButton als Link zu verwenden
+import Link from "next/link";
 
 interface SidebarListProps {
   categories: CategoryItem[];
   selectedCatId: string | null;
-  /**
-   * onSelectCategory:
-   *  - Wenn catId = null => Nichts ausgewählt (Collapse zu)
-   *  - Wenn catId = "CAT-002", etc. => diese Category öffnen
-   */
   onSelectCategory: (catId: string | null) => void;
 }
 
@@ -59,15 +53,27 @@ interface SidebarListItemProps {
 }
 
 function SidebarListItem({ category, selected, onToggle }: SidebarListItemProps) {
+  // NEU: Prüfen, ob in Discord gelöscht
+  const isDeletedInDiscord = category.deletedInDiscord === true;
+
   return (
-    <Box sx={{ "&:hover": { backgroundColor: "transparent" } }}>
-      {/* Header-Bereich, jetzt mit Edit-Icon ganz rechts */}
+    <Box
+      // NEU: falls `deletedInDiscord` => roten Hintergrund
+      sx={{
+        // Eine leichte rote Tönung
+        backgroundColor: isDeletedInDiscord ? "rgba(255, 0, 0, 0.08)" : "inherit",
+        "&:hover": {
+          // Bei Hover etwas stärker
+          backgroundColor: isDeletedInDiscord ? "rgba(255, 0, 0, 0.12)" : "transparent",
+        },
+      }}
+    >
+      {/* Header-Bereich */}
       <Box
         sx={{
           px: 2,
           py: 1,
           borderBottom: "1px solid var(--mui-palette-divider)",
-          // Wir machen ein flex-Layout, damit wir rechts das Icon platzieren
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -85,13 +91,19 @@ function SidebarListItem({ category, selected, onToggle }: SidebarListItemProps)
               ? `Last used: ${category.lastUsedAt.toLocaleTimeString()}`
               : "No usage"}
           </Typography>
+
+          {/* NEU: Info-Text, wenn deletedInDiscord */}
+          {isDeletedInDiscord && (
+            <Typography
+              variant="caption"
+              sx={{ color: "error.main", display: "block", fontWeight: "bold" }}
+            >
+              Gelöscht im Discord
+            </Typography>
+          )}
         </Box>
 
-        {/* Rechts: Edit-Icon. 
-            Link zu /dashboard/categories/edit/[category.id].
-            ACHTUNG: stopPropagation => Wir verhindern, dass onClick={onToggle} auslöst, wenn man 
-            aufs Icon klickt (sonst klappen wir Collapse auf/zu).
-        */}
+        {/* Rechts: Edit-Icon */}
         <IconButton
           component={Link}
           href={`/dashboard/categories/edit/${category.id}`}

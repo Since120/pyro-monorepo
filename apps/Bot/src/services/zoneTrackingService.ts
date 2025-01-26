@@ -1,8 +1,8 @@
 // src/bot/services/zoneTrackingService.ts
 
-import { prisma } from './dbClient';
-import { getZoneByKey } from './zoneService';
-import logger from './logger';
+import { prisma } from "./dbClient";
+import { getZoneByKey } from "./zoneService";
+import logger from "./logger";
 
 /**
  * Bsp-Datentyp fürs Update
@@ -21,8 +21,11 @@ export interface ZoneTrackingUpdate {
  *
  * Gibt das Ergebnis zurück, z.B. { pointsGained: 5 }
  */
-export async function trackTimeInZone({ userId, zoneKey, deltaSeconds }: ZoneTrackingUpdate)
-: Promise<{ pointsGained: number }> {
+export async function trackTimeInZone({
+  userId,
+  zoneKey,
+  deltaSeconds,
+}: ZoneTrackingUpdate): Promise<{ pointsGained: number }> {
   // 1) Falls deltaSeconds <= 0 => nichts tun
   if (deltaSeconds <= 0) {
     return { pointsGained: 0 };
@@ -41,7 +44,7 @@ export async function trackTimeInZone({ userId, zoneKey, deltaSeconds }: ZoneTra
   }
 
   // 3) Hole Info aus Zone-Tabelle: minutesRequired, pointsGranted
-  const zone = await getZoneByKey(zoneKey); 
+  const zone = await getZoneByKey(zoneKey);
   if (!zone) {
     // Falls es die Zone nicht mehr gibt (gelöscht?), Abbruch
     logger.warn(`Zone ${zoneKey} nicht gefunden, breche ab.`);

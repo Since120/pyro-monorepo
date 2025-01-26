@@ -1,31 +1,48 @@
-// src/bot/index.ts
+// apps/Bot/src/index.ts
 
-import 'dotenv/config';
-import { Client, IntentsBitField, Collection, Interaction, VoiceState, StringSelectMenuInteraction, UserSelectMenuInteraction} from 'discord.js';
-import fs from 'fs';
-import path from 'path';
+import "dotenv/config";
+import * as dotenv from 'dotenv';
+import * as dotenvExpand from 'dotenv-expand';
+import {
+  Client,
+  IntentsBitField,
+  Collection,
+  Interaction,
+  VoiceState,
+  StringSelectMenuInteraction,
+  UserSelectMenuInteraction,
+} from "discord.js";
+import fs from "fs";
+import path from "path";
 
-import logger from './services/logger';
-import { ExtendedClient, BotCommand } from './extendedClient';
-import voiceStateUpdate from './events/voiceStateUpdate';
-import { startWebhookServer } from './webhookServer'; // <-- NEUER Import
+import logger from "./services/logger";
+import { ExtendedClient, BotCommand } from "./extendedClient";
+import voiceStateUpdate from "./events/voiceStateUpdate";
 
+// NEU: unser HTTP-Server, der API-Requests entgegen nimmt
+import { startBotHttpServer } from "./botHttpServer";
+import { registerDiscordEvents } from "./events"; // <--- unser "events/index.ts"
 
+// 1) Bot-Client erstellen
 export const client = new Client({
   intents: [
     IntentsBitField.Flags.Guilds,
     IntentsBitField.Flags.GuildMembers,
     IntentsBitField.Flags.GuildVoiceStates,
-    // Weitere Intents nach Bedarf ...
+    // etc. je nach Bedarf ...
   ],
 }) as ExtendedClient;
 
+const myEnv = dotenv.config(); // Lädt deine .env
+dotenvExpand.expand(myEnv);    // Erweitert Variablen wie ${POSTGRES_HOST} usw.
 
+// 2) Slash Commands laden
 client.commands = new Collection<string, BotCommand>();
 
-// 1) Slash Commands laden
-const commandsPath = path.join(__dirname, 'commands', 'slashCommands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.ts') || file.endsWith('.js'));
+const commandsPath = path.join(__dirname, "commands", "slashCommands");
+const commandFiles = fs
+  .readdirSync(commandsPath)
+  .filter((file) => file.endsWith(".ts") || file.endsWith(".js"));
 
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
@@ -40,62 +57,58 @@ for (const file of commandFiles) {
   }
 }
 
-// 2) Webhook-Server starten
-startWebhookServer();
+// 3) HTTP-Server starten (NEU)
+startBotHttpServer();
 
-// 2) interactionCreate
-client.on('interactionCreate', async (interaction: Interaction) => {
-  // 2a) Slash Command
+registerDiscordEvents(client);
+
+// 4) Discord-Event: interactionCreate
+client.on("interactionCreate", async (interaction: Interaction) => {
+  // 4a) Slash Command
   if (interaction.isChatInputCommand()) {
     const { commandName } = interaction;
     const cmd = client.commands.get(commandName);
     if (!cmd) {
-      return interaction.reply({ content: 'Unbekannter Slash-Befehl!', ephemeral: true });
+      return interaction.reply({ content: "Unbekannter Slash-Befehl!", ephemeral: true });
     }
     try {
       await cmd.execute(interaction);
     } catch (err) {
-      logger.error('Slash Command Error:', err);
+      logger.error("Slash Command Error:", err);
       if (!interaction.replied) {
-        await interaction.reply({ content: 'Fehler!', ephemeral: true });
+        await interaction.reply({ content: "Fehler!", ephemeral: true });
       }
     }
   }
-  // 2b) Button
+  // 4b) Button
   else if (interaction.isButton()) {
-    const { handleButton } = require('./interaction_handlers/buttonInteractions');
+    const { handleButton } = require("./interaction_handlers/buttonInteractions");
     return handleButton(interaction);
   }
-  // 2c) ModalSubmit
+  // 4c) ModalSubmit
   else if (interaction.isModalSubmit()) {
-    const { handleModal } = require('./interaction_handlers/modalInteractions');
+    const { handleModal } = require("./interaction_handlers/modalInteractions");
     return handleModal(interaction);
   }
-  // 2d) SelectMenu (StringSelect oder UserSelect)
+  // 4d) SelectMenu
   else if (interaction.isAnySelectMenu()) {
-    logger.info(`(DEBUG) We have isAnySelectMenu(): customId=${interaction.customId}`);
-
-    // Hier wandeln wir den allgemeinen Typ Interaction 
-    // explizit in "StringSelectMenuInteraction | UserSelectMenuInteraction" um.
-    // So können wir in handleSelectMenu problemlos auf customId etc. zugreifen.
     const typedSelectMenu = interaction as StringSelectMenuInteraction | UserSelectMenuInteraction;
-
-    const { handleSelectMenu } = require('./interaction_handlers/selectMenuInteractions');
+    const { handleSelectMenu } = require("./interaction_handlers/selectMenuInteractions");
     return handleSelectMenu(typedSelectMenu);
   }
 });
 
-// 3) voiceStateUpdate
-client.on('voiceStateUpdate', (oldState: VoiceState, newState: VoiceState) => {
+// 5) VoiceStateUpdate
+client.on("voiceStateUpdate", (oldState: VoiceState, newState: VoiceState) => {
   voiceStateUpdate(oldState, newState);
 });
 
-// 4) Bot-Login
+// 6) Bot-Login
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
-  logger.error('Fehler: Keine DISCORD_TOKEN in .env');
+  logger.error("Fehler: Keine DISCORD_TOKEN in .env");
   process.exit(1);
 }
 client.login(token).then(() => {
-  logger.info('Bot online!');
+  logger.info("Bot online!");
 });

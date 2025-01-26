@@ -1,3 +1,5 @@
+// KOMPLETTE Datei: apps/api/src/categories/categories.controller.ts
+
 import {
   Controller,
   Get,
@@ -15,41 +17,62 @@ import { CategoriesService } from './categories.service';
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
+  // -----------------------------------
+  // 1) GET /categories
+  // -----------------------------------
   @Get()
   async findAll() {
     try {
       const cats = await this.categoriesService.findAll();
-      return cats; // Nest.js serialisiert als JSON
+      return cats;
     } catch (err) {
       console.error('Fehler in findAll():', err);
-      throw new HttpException(
-        'Internal Server Error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
+  // -----------------------------------
+  // 2) POST /categories
+  // -----------------------------------
   @Post()
   async create(
     @Body() body: { name: string; categoryType: string; isVisible?: boolean },
   ) {
     if (!body.name || !body.categoryType) {
-      throw new HttpException(
-        'name & categoryType required',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('name & categoryType required', HttpStatus.BAD_REQUEST);
     }
     try {
       const newCat = await this.categoriesService.createCategory(body);
       return newCat;
     } catch (err) {
-      throw new HttpException(
-        'Internal Server Error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      console.error('Fehler in create():', err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
+  // -----------------------------------
+  // 3) PATCH /categories/discord-deleted
+  // (Route für den Bot: Channel gelöscht)
+  // -----------------------------------
+  @Patch('discord-deleted')
+  async markAsDeletedInDiscord(@Body() body: { discordCategoryId: string }) {
+    // ACHTUNG: Wir nennen es im Body "discordCategoryId"
+    if (!body.discordCategoryId) {
+      throw new HttpException('Missing discordCategoryId', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      const res = await this.categoriesService.markAsDeletedInDiscord(body.discordCategoryId);
+      return { ok: true, data: res };
+    } catch (err) {
+      console.error('Fehler in markAsDeletedInDiscord:', err);
+      throw new HttpException('Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // -----------------------------------
+  // 4) PATCH /categories/:id
+  //    => Update Category
+  // -----------------------------------
   @Patch(':id')
   async update(
     @Param('id') catId: string,
@@ -68,13 +91,14 @@ export class CategoriesController {
       const updated = await this.categoriesService.updateCategory(catId, body);
       return updated;
     } catch (err) {
-      throw new HttpException(
-        'Internal Server Error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      console.error('Fehler in update():', err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
+  // -----------------------------------
+  // 5) DELETE /categories/:id
+  // -----------------------------------
   @Delete(':id')
   async remove(@Param('id') catId: string) {
     if (!catId) {
@@ -84,10 +108,8 @@ export class CategoriesController {
       const deleted = await this.categoriesService.deleteCategory(catId);
       return deleted;
     } catch (err) {
-      throw new HttpException(
-        'Internal Server Error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      console.error('Fehler in remove():', err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

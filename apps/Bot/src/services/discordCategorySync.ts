@@ -1,129 +1,96 @@
-// src/services/discordCategorySync.ts
-import { prisma } from './dbClient';
-import { client } from '../index'; // dein Discord Client
-import { ChannelType, GuildChannel } from 'discord.js';
-import logger from './logger';
+// apps/Bot/src/services/discordCategorySync.ts
+
+import { client } from "../index";
+import { ChannelType, GuildChannel } from "discord.js";
+import logger from "./logger";
 
 /**
- * Legt in Discord eine neue Kategorie an und speichert deren ID in der DB.
- * - categoryId: DB-ID der Category
- * - name: Name (z.B. "═══ VOICE 🔊 ═══════════")
+ * Legt in Discord eine neue Kategorie an.
+ * Return: die erstellte channelId (discordCategoryId).
  */
-export async function createDiscordCategory(categoryId: string, name: string): Promise<void> {
+export async function createDiscordCategory(name: string): Promise<string> {
   try {
-    // 1) Such dir das Guild-Objekt (per ID in .env)
-    const guildId = process.env.GUILD_ID; 
+    const guildId = process.env.GUILD_ID;
     if (!guildId) {
-      logger.warn('createDiscordCategory: Keine DISCORD_GUILD_ID in .env definiert!');
-      return;
+      logger.warn("createDiscordCategory: Keine GUILD_ID in .env definiert!");
+      return "";
     }
     const guild = client.guilds.cache.get(guildId);
     if (!guild) {
       logger.warn(`createDiscordCategory: Guild ${guildId} nicht gefunden.`);
-      return;
+      return "";
     }
 
-    // 2) Discord-Category anlegen
     const created = await guild.channels.create({
-      name: name,
+      name,
       type: ChannelType.GuildCategory,
-      reason: 'Automatische Erstellung via Webhook',
+      reason: "Automatisch via API->Bot"
     });
 
-    // 3) In DB: discordCategoryId eintragen
-    await prisma.category.update({
-      where: { id: categoryId },
-      data: { discordCategoryId: created.id },
-    });
-
-    logger.info(`createDiscordCategory: Category "${name}" in Discord erstellt (ID=${created.id}).`);
+    logger.info(`createDiscordCategory: Channel "${created.name}" erstellt (ID=${created.id}).`);
+    return created.id;
   } catch (err) {
-    logger.error('createDiscordCategory Fehler:', err);
+    logger.error("createDiscordCategory Fehler:", err);
+    return "";
   }
 }
 
 /**
- * Aktualisiert den Namen in Discord, basierend auf existingCategory.discordCategoryId
+ * Benennt eine existierende Discord-Kategorie (Channel) um.
+ * channelId => die Discord channel id
  */
-export async function updateDiscordCategory(categoryId: string, name: string): Promise<void> {
+export async function renameDiscordCategory(channelId: string, newName: string): Promise<void> {
   try {
-    // 1) DB => Hol dir das Feld discordCategoryId
-    const cat = await prisma.category.findUnique({ where: { id: categoryId } });
-    if (!cat) {
-      logger.warn(`updateDiscordCategory: CategoryId=${categoryId} nicht gefunden.`);
+    const guildId = process.env.GUILD_ID;
+    if (!guildId) {
+      logger.warn("renameDiscordCategory: Keine GUILD_ID in .env");
       return;
     }
-    if (!cat.discordCategoryId) {
-      // => es gibt noch keinen Discord-Kanal => evtl. anlegen?
-      logger.info(`updateDiscordCategory: Keine discordCategoryId => wir legen neu an.`);
-      return createDiscordCategory(categoryId, name);
-    }
-
-    // 2) Discord-Kanal suchen
-    const guildId = process.env.GUILD_ID;
-    if (!guildId) return;
     const guild = client.guilds.cache.get(guildId);
     if (!guild) {
-      logger.warn(`updateDiscordCategory: Guild ${guildId} nicht gefunden.`);
+      logger.warn(`renameDiscordCategory: Guild ${guildId} nicht gefunden.`);
       return;
     }
 
-    const channel = guild.channels.cache.get(cat.discordCategoryId) as GuildChannel | undefined;
+    const channel = guild.channels.cache.get(channelId) as GuildChannel | undefined;
     if (!channel) {
-      logger.warn(`updateDiscordCategory: Channel ${cat.discordCategoryId} nicht im Cache gefunden. Evtl. neu anlegen?`);
-      // Du könntest hier createDiscordCategory(categoryId, name) aufrufen. 
+      logger.warn(`renameDiscordCategory: Channel ${channelId} nicht gefunden!`);
       return;
     }
 
-    // 3) Rename
-    await channel.setName(name);
-    logger.info(`updateDiscordCategory: Channel ${channel.id} umbenannt zu "${name}".`);
+    await channel.setName(newName);
+    logger.info(`renameDiscordCategory: Channel ${channel.id} umbenannt zu "${newName}".`);
   } catch (err) {
-    logger.error('updateDiscordCategory Fehler:', err);
+    logger.error("renameDiscordCategory Fehler:", err);
   }
 }
 
 /**
- * Löscht die zugeordnete Discord-Kategorie
- * und setzt discordCategoryId = null in DB.
+ * Löscht einen Channel in Discord.
+ * channelId => discordChannelId
  */
-export async function deleteDiscordCategory(categoryId: string): Promise<void> {
+export async function removeDiscordCategory(channelId: string): Promise<void> {
   try {
-    // 1) DB => find
-    const cat = await prisma.category.findUnique({ where: { id: categoryId } });
-    if (!cat) {
-      logger.warn(`deleteDiscordCategory: CategoryId=${categoryId} nicht gefunden.`);
-      return;
-    }
-
-    if (!cat.discordCategoryId) {
-      logger.info(`deleteDiscordCategory: Keine discordCategoryId => nix zu löschen in Discord.`);
-      return;
-    }
-
-    // 2) Channel in Discord suchen
     const guildId = process.env.GUILD_ID;
-    if (!guildId) return;
+    if (!guildId) {
+      logger.warn("removeDiscordCategory: Keine GUILD_ID in .env");
+      return;
+    }
     const guild = client.guilds.cache.get(guildId);
     if (!guild) {
-      logger.warn(`deleteDiscordCategory: Guild ${guildId} nicht gefunden.`);
+      logger.warn(`removeDiscordCategory: Guild ${guildId} nicht gefunden.`);
       return;
     }
 
-    const channel = guild.channels.cache.get(cat.discordCategoryId);
+    const channel = guild.channels.cache.get(channelId);
     if (!channel) {
-      logger.warn(`deleteDiscordCategory: Channel ${cat.discordCategoryId} nicht (mehr) gefunden, ignoriere...`);
-    } else {
-      await channel.delete('Automatische Löschung via Webhook');
-      logger.info(`deleteDiscordCategory: Channel ${cat.discordCategoryId} gelöscht.`);
+      logger.warn(`removeDiscordCategory: Channel ${channelId} nicht (mehr) gefunden.`);
+      return;
     }
 
-    // 3) DB updaten
-    await prisma.category.update({
-      where: { id: categoryId },
-      data: { discordCategoryId: null },
-    });
+    await channel.delete("Automatische Löschung via API->Bot");
+    logger.info(`removeDiscordCategory: Channel ${channelId} gelöscht.`);
   } catch (err) {
-    logger.error('deleteDiscordCategory Fehler:', err);
+    logger.error("removeDiscordCategory Fehler:", err);
   }
 }

@@ -1,6 +1,6 @@
 // src/bot/services/roleConfigService.ts
-import { PrismaClient } from '@prisma/client';
-import logger from './logger';
+import { PrismaClient } from "@prisma/client";
+import logger from "./logger";
 
 const prisma = new PrismaClient();
 

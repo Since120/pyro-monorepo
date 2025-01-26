@@ -1,7 +1,7 @@
 // src/bot/services/globalStatsService.ts
 
-import { prisma } from './dbClient';
-import logger from './logger';
+import { prisma } from "./dbClient";
+import logger from "./logger";
 
 /**
  * addToUserGlobalStats
@@ -26,7 +26,9 @@ export async function addToUserGlobalStats(userId: string, timeSec: number, poin
         totalPoints: points,
       },
     });
-    logger.info(`UserGlobalStats neu erstellt: userId=${userId}, +time=${timeSec}, +points=${points}`);
+    logger.info(
+      `UserGlobalStats neu erstellt: userId=${userId}, +time=${timeSec}, +points=${points}`
+    );
   } else {
     // vorhandene Stats updaten
     const newTime = stats.totalTimeInAllZones + timeSec;
@@ -39,7 +41,9 @@ export async function addToUserGlobalStats(userId: string, timeSec: number, poin
         totalPoints: newPoints,
       },
     });
-    logger.info(`UserGlobalStats aktualisiert: userId=${userId}, +time=${timeSec}, +points=${points}`);
+    logger.info(
+      `UserGlobalStats aktualisiert: userId=${userId}, +time=${timeSec}, +points=${points}`
+    );
   }
 
   // SPÄTER: Hier könntest du Cap / MWST einbauen

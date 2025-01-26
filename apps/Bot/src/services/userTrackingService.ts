@@ -1,7 +1,7 @@
 // src/bot/services/userTrackingService.ts
 
-import { prisma } from './dbClient';
-import logger from './logger';
+import { prisma } from "./dbClient";
+import logger from "./logger";
 
 /**
  * Setzt isTracked (true/false) für einen User (userId).

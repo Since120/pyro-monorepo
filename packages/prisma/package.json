@@ -5,7 +5,7 @@
     "scripts": {
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "generate": "prisma generate",
+    "generate:dev": "prisma generate dev",
     "studio": "prisma studio --schema ./schema.prisma"
 
   },

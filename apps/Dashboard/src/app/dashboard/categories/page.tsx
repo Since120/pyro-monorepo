@@ -7,36 +7,40 @@ export const metadata: Metadata = {
   title: "Categories | Dashboard",
 };
 
-// Hier eine Helper-Funktion
+// Lade Kategorien aus der DB
 async function loadAllCategories(): Promise<CategoryItem[]> {
-  // Prisma: Alle Category-Einträge
-  // Du hast in schema: id, name, categoryType, isVisible, ...
-  // In `CategoryItem` definierst du: { id, name, createdAt?, lastUsedAt? }
+  // 1) Prisma: Alle Category-Einträge
+  const dbCats = await prisma.category.findMany({
+    // Optional könntest du hier "select" setzen, wenn du nur bestimmte Spalten brauchst
+    // select: { id: true, name: true, deletedInDiscord: true, ... }
+  });
 
-  const dbCats = await prisma.category.findMany();
-  // => dbCats = Array<{ id: string, name: string, categoryType: string, ... }>
-
-  // Mappen auf dein CategoryItem, z. B.:
+  // 2) Auf dein "CategoryItem" mappen
   const catItems = dbCats.map((cat) => {
     return {
       id: cat.id,
       name: cat.name,
-      // Du kannst cat.createdAt übernehmen in createdAt (Date),
-      // cat.lastUsage in lastUsedAt, etc.
-      createdAt: cat.createdAt ?? undefined,
+
+      // Falls du "lastUsage" in der DB hast => lastUsedAt
       lastUsedAt: cat.lastUsage ?? null,
+
+      // Falls du "createdAt" in der DB hast => createdAt
+      createdAt: cat.createdAt ?? undefined,
+
+      // WICHTIG:deletedInDiscord => highlight
+      deletedInDiscord: cat.deletedInDiscord ?? false,
     } as CategoryItem;
   });
 
   return catItems;
 }
 
-// *** SERVER Component (async) ***
-// -> Lädt echte Daten
+// Deine (Server) Page-Component
 export default async function Page() {
   const categories = await loadAllCategories();
 
-  // categories -> an dein <CategoriesView />
+  // Hier kriegt <CategoriesView> das Feld "deletedInDiscord"
+  // und kann es in sidebar-list.tsx rot hervorheben.
   return (
     <CategoriesView categories={categories} />
   );

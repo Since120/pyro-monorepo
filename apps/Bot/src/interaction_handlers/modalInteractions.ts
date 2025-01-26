@@ -1,34 +1,29 @@
-import {
-  ModalSubmitInteraction,
-  ActionRowBuilder,
-  StringSelectMenuBuilder,
-} from 'discord.js';
-import logger from '../services/logger';
+import { ModalSubmitInteraction, ActionRowBuilder, StringSelectMenuBuilder } from "discord.js";
+import logger from "../services/logger";
 
-// Falls du dein sessionData anderswo brauchst, 
+// Falls du dein sessionData anderswo brauchst,
 // kannst du es natürlich in einer separaten Datei pflegen.
 const sessionData: Map<string, { channelName?: string; zoneKey?: string }> = new Map();
 
 // NEU: Prisma-Import
-import { prisma } from '../services/dbClient';
+import { prisma } from "../services/dbClient";
 
 export async function handleModal(interaction: ModalSubmitInteraction) {
   const customId = interaction.customId;
   logger.info(`Modal Submit: ${customId} by ${interaction.user.tag}`);
 
-  if (customId === 'channel_name_modal') {
+  if (customId === "channel_name_modal") {
     return handleChannelNameSubmit(interaction);
-  } 
-  else if (customId === 'rename_channel_modal') {
+  } else if (customId === "rename_channel_modal") {
     return handleRenameChannelSubmit(interaction);
   }
   // NEU: Limit-Modal
-  else if (customId === 'limit_channel_modal') {
+  else if (customId === "limit_channel_modal") {
     return handleLimitChannelSubmit(interaction);
   }
 
   return interaction.reply({
-    content: 'Unbekanntes Modal.',
+    content: "Unbekanntes Modal.",
     ephemeral: true,
   });
 }
@@ -38,10 +33,10 @@ export async function handleModal(interaction: ModalSubmitInteraction) {
  * (Neuen Voice-Kanal erstellen).
  */
 async function handleChannelNameSubmit(interaction: ModalSubmitInteraction) {
-  const channelName = interaction.fields.getTextInputValue('channel_name_input')?.trim();
+  const channelName = interaction.fields.getTextInputValue("channel_name_input")?.trim();
   if (!channelName) {
     return interaction.reply({
-      content: 'Kanalname darf nicht leer sein.',
+      content: "Kanalname darf nicht leer sein.",
       ephemeral: true,
     });
   }
@@ -52,13 +47,13 @@ async function handleChannelNameSubmit(interaction: ModalSubmitInteraction) {
 
   // Jetzt wollen wir die Zonen-Auswahl als SelectMenu zeigen.
   // ACHTUNG: Pfad anpassen => "../interactions/selectMenus/zoneSelectHandler"
-  const { buildZoneSelectMenu } = require('../interactions/selectMenus/zoneSelectHandler');
+  const { buildZoneSelectMenu } = require("../interactions/selectMenus/zoneSelectHandler");
 
   let menuRow;
   try {
-    menuRow = await buildZoneSelectMenu('zone_select_create');
+    menuRow = await buildZoneSelectMenu("zone_select_create");
   } catch (err) {
-    logger.error('Fehler beim Erstellen des Zonen-Menüs:', err);
+    logger.error("Fehler beim Erstellen des Zonen-Menüs:", err);
     return interaction.reply({
       content: `Fehler bei der Zonen-Auswahl: ${(err as Error).message}`,
       ephemeral: true,
@@ -76,10 +71,10 @@ async function handleChannelNameSubmit(interaction: ModalSubmitInteraction) {
  * NEU: Wird getriggert, wenn der User den Kanal-Umbenennen-Modal abschickt.
  */
 async function handleRenameChannelSubmit(interaction: ModalSubmitInteraction) {
-  const newName = interaction.fields.getTextInputValue('rename_channel_input')?.trim();
+  const newName = interaction.fields.getTextInputValue("rename_channel_input")?.trim();
   if (!newName) {
     return interaction.reply({
-      content: 'Der neue Kanalname darf nicht leer sein.',
+      content: "Der neue Kanalname darf nicht leer sein.",
       ephemeral: true,
     });
   }
@@ -87,7 +82,7 @@ async function handleRenameChannelSubmit(interaction: ModalSubmitInteraction) {
   const guild = interaction.guild;
   if (!guild) {
     return interaction.reply({
-      content: 'Fehler: Nur in einer Gilde nutzbar.',
+      content: "Fehler: Nur in einer Gilde nutzbar.",
       ephemeral: true,
     });
   }
@@ -97,7 +92,7 @@ async function handleRenameChannelSubmit(interaction: ModalSubmitInteraction) {
   const voiceChannel = member.voice.channel;
   if (!voiceChannel) {
     return interaction.reply({
-      content: 'Du bist aktuell in keinem Voice-Kanal.',
+      content: "Du bist aktuell in keinem Voice-Kanal.",
       ephemeral: true,
     });
   }
@@ -109,7 +104,7 @@ async function handleRenameChannelSubmit(interaction: ModalSubmitInteraction) {
 
   if (!dynamicChannel) {
     return interaction.reply({
-      content: 'Dies ist kein dynamischer Kanal (oder nicht vom Bot verwaltet).',
+      content: "Dies ist kein dynamischer Kanal (oder nicht vom Bot verwaltet).",
       ephemeral: true,
     });
   }
@@ -117,7 +112,7 @@ async function handleRenameChannelSubmit(interaction: ModalSubmitInteraction) {
   // Sicherheitshalber nochmals checken, ob der User der Ersteller ist
   if (dynamicChannel.createdByUser !== interaction.user.id) {
     return interaction.reply({
-      content: 'Nur der Ersteller dieses Kanals darf den Namen ändern.',
+      content: "Nur der Ersteller dieses Kanals darf den Namen ändern.",
       ephemeral: true,
     });
   }
@@ -126,7 +121,7 @@ async function handleRenameChannelSubmit(interaction: ModalSubmitInteraction) {
   const { zoneKey } = dynamicChannel;
   if (!zoneKey) {
     return interaction.reply({
-      content: 'Keine Zone für diesen Kanal gefunden, Umbenennen nicht möglich.',
+      content: "Keine Zone für diesen Kanal gefunden, Umbenennen nicht möglich.",
       ephemeral: true,
     });
   }
@@ -139,9 +134,9 @@ async function handleRenameChannelSubmit(interaction: ModalSubmitInteraction) {
       ephemeral: true,
     });
   } catch (err) {
-    logger.error('Fehler beim Umbenennen:', err);
+    logger.error("Fehler beim Umbenennen:", err);
     return interaction.reply({
-      content: 'Konnte den Kanal nicht umbenennen.',
+      content: "Konnte den Kanal nicht umbenennen.",
       ephemeral: true,
     });
   }
@@ -151,10 +146,10 @@ async function handleRenameChannelSubmit(interaction: ModalSubmitInteraction) {
  * NEU: Wird getriggert, wenn der User das Kanal-Limit-Modal abschickt.
  */
 async function handleLimitChannelSubmit(interaction: ModalSubmitInteraction) {
-  const limitValue = interaction.fields.getTextInputValue('limit_channel_input')?.trim();
+  const limitValue = interaction.fields.getTextInputValue("limit_channel_input")?.trim();
   if (!limitValue) {
     return interaction.reply({
-      content: 'Bitte gib ein Limit ein (0 für unbegrenzt).',
+      content: "Bitte gib ein Limit ein (0 für unbegrenzt).",
       ephemeral: true,
     });
   }
@@ -163,7 +158,7 @@ async function handleLimitChannelSubmit(interaction: ModalSubmitInteraction) {
   const limitNumber = parseInt(limitValue, 10);
   if (isNaN(limitNumber) || limitNumber < 0 || limitNumber > 99) {
     return interaction.reply({
-      content: 'Ungültige Eingabe. Bitte gib eine Zahl zwischen 0 und 99 ein.',
+      content: "Ungültige Eingabe. Bitte gib eine Zahl zwischen 0 und 99 ein.",
       ephemeral: true,
     });
   }
@@ -171,7 +166,7 @@ async function handleLimitChannelSubmit(interaction: ModalSubmitInteraction) {
   const guild = interaction.guild;
   if (!guild) {
     return interaction.reply({
-      content: 'Fehler: Nur in einer Gilde nutzbar.',
+      content: "Fehler: Nur in einer Gilde nutzbar.",
       ephemeral: true,
     });
   }
@@ -181,7 +176,7 @@ async function handleLimitChannelSubmit(interaction: ModalSubmitInteraction) {
   const voiceChannel = member.voice.channel;
   if (!voiceChannel) {
     return interaction.reply({
-      content: 'Du bist aktuell in keinem Voice-Kanal.',
+      content: "Du bist aktuell in keinem Voice-Kanal.",
       ephemeral: true,
     });
   }
@@ -193,7 +188,7 @@ async function handleLimitChannelSubmit(interaction: ModalSubmitInteraction) {
 
   if (!dynamicChannel) {
     return interaction.reply({
-      content: 'Dies ist kein dynamischer Kanal (oder nicht vom Bot verwaltet).',
+      content: "Dies ist kein dynamischer Kanal (oder nicht vom Bot verwaltet).",
       ephemeral: true,
     });
   }
@@ -201,7 +196,7 @@ async function handleLimitChannelSubmit(interaction: ModalSubmitInteraction) {
   // Ersteller-Check
   if (dynamicChannel.createdByUser !== interaction.user.id) {
     return interaction.reply({
-      content: 'Nur der Ersteller dieses Kanals darf das Nutzerlimit ändern.',
+      content: "Nur der Ersteller dieses Kanals darf das Nutzerlimit ändern.",
       ephemeral: true,
     });
   }
@@ -212,7 +207,7 @@ async function handleLimitChannelSubmit(interaction: ModalSubmitInteraction) {
 
     if (limitNumber === 0) {
       return interaction.reply({
-        content: 'Kanal-Limit wurde entfernt (unbegrenzt).',
+        content: "Kanal-Limit wurde entfernt (unbegrenzt).",
         ephemeral: true,
       });
     } else {
@@ -221,11 +216,10 @@ async function handleLimitChannelSubmit(interaction: ModalSubmitInteraction) {
         ephemeral: true,
       });
     }
-
   } catch (err) {
-    logger.error('Fehler beim Setzen des Kanal-Limits:', err);
+    logger.error("Fehler beim Setzen des Kanal-Limits:", err);
     return interaction.reply({
-      content: 'Konnte das Kanal-Limit nicht ändern.',
+      content: "Konnte das Kanal-Limit nicht ändern.",
       ephemeral: true,
     });
   }
