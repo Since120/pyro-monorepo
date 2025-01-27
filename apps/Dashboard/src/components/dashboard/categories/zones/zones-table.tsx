@@ -2,116 +2,105 @@
 "use client";
 
 import * as React from "react";
-import IconButton from "@mui/material/IconButton";
-import { NotePencil as NotePencilIcon } from "@phosphor-icons/react/dist/ssr/NotePencil";
+import Link from "next/link";
 import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
 import Typography from "@mui/material/Typography";
+import { NotePencil as NotePencilIcon } from "@phosphor-icons/react/dist/ssr/NotePencil";
 
-import { DataTable } from "@/components/core/data-table"; 
+// OPTIONAL: Falls du Pfade hast
+import { paths } from "@/paths";
+import { DataTable } from "@/components/core/data-table";
 import type { ColumnDef } from "@/components/core/data-table";
 
 import type { ZoneResult } from "./types";
 import { useZonesSelection } from "./zones-selection-context";
-import Link from "next/link";
 
-// OPTIONAL: Falls du Pfade hast
-import { paths } from "@/paths";
-// Falls du das nicht hast, kannst du es weglassen oder dummy. 
+// Falls du das nicht hast, kannst du es weglassen oder dummy.
 // import Link from "next/link";
 
 const columns: ColumnDef<ZoneResult>[] = [
-  { field: "zoneKey", name: "Zonen Key", width: "100px" },
-  { field: "zoneName", name: "Zonen Name", width: "150px" },
-  {
-    formatter: (row) => String(row.minutesRequired),
-    name: "Minuten",
-    width: "80px",
-  },
-  {
-    formatter: (row) => String(row.pointsGranted),
-    name: "Punkte",
-    width: "80px",
-  },
-  {
-    formatter: (row) => {
-      const hours = Math.floor(row.totalSecondsInZone / 3600);
-      const minutes = Math.floor((row.totalSecondsInZone % 3600) / 60);
-      return `${hours}h ${minutes}m`;
-    },
-    name: "Gesamtzeit",
-    width: "120px",
-  },
-  {
-    name: "Kategorie",
-    width: "250px",
-    formatter: (row) => {
-      if (!row.categoryName) return "-";
-      // NEU: Prüfen, ob categoryDeletedInDiscord
-      if (row.categoryDeletedInDiscord) {
-        return (
-          <Box sx={{ color: "error.main", fontWeight: "bold" }}>
-            {row.categoryName} (Gelöscht)
-          </Box>
-        );
-      }
-      return row.categoryName;
-    },
-  },
-  {
-    formatter: (row) => {
-      if (!row.lastUsage) return "-";
-      return new Date(row.lastUsage).toLocaleString();
-    },
-    name: "Zuletzt benutzt",
-    width: "180px",
-  },
-  {
-    formatter: (row) => (
-      <IconButton
-        component={Link}
-        href={`/dashboard/categories/zones/edit/${row.id}`}
-      >
-        <NotePencilIcon />
-      </IconButton>
-    ),
-    name: "Edit",
-    hideName: true,
-    width: "80px",
-    align: "right",
-  },
+	{ field: "zoneKey", name: "Zonen Key", width: "100px" },
+	{ field: "zoneName", name: "Zonen Name", width: "150px" },
+	{
+		formatter: (row) => String(row.minutesRequired),
+		name: "Minuten",
+		width: "80px",
+	},
+	{
+		formatter: (row) => String(row.pointsGranted),
+		name: "Punkte",
+		width: "80px",
+	},
+	{
+		formatter: (row) => {
+			const hours = Math.floor(row.totalSecondsInZone / 3600);
+			const minutes = Math.floor((row.totalSecondsInZone % 3600) / 60);
+			return `${hours}h ${minutes}m`;
+		},
+		name: "Gesamtzeit",
+		width: "120px",
+	},
+	{
+		name: "Kategorie",
+		width: "250px",
+		formatter: (row) => {
+			if (!row.categoryName) return "-";
+			// NEU: Prüfen, ob categoryDeletedInDiscord
+			if (row.categoryDeletedInDiscord) {
+				return <Box sx={{ color: "error.main", fontWeight: "bold" }}>{row.categoryName} (Gelöscht)</Box>;
+			}
+			return row.categoryName;
+		},
+	},
+	{
+		formatter: (row) => {
+			if (!row.lastUsage) return "-";
+			return new Date(row.lastUsage).toLocaleString();
+		},
+		name: "Zuletzt benutzt",
+		width: "180px",
+	},
+	{
+		formatter: (row) => (
+			<IconButton component={Link} href={`/dashboard/categories/zones/edit/${row.id}`}>
+				<NotePencilIcon />
+			</IconButton>
+		),
+		name: "Edit",
+		hideName: true,
+		width: "80px",
+		align: "right",
+	},
 ];
 
 export interface ZonesTableProps {
-  rows: ZoneResult[];
+	rows: ZoneResult[];
 }
 
 export function ZonesTable({ rows }: ZonesTableProps) {
-  const { deselectAll, deselectOne, selectAll, selectOne, selected } = useZonesSelection();
+	const { deselectAll, deselectOne, selectAll, selectOne, selected } = useZonesSelection();
 
-  return (
-    <>
-      <DataTable<ZoneResult>
-        columns={columns}
-        rows={rows}
-        selectable
-        selected={selected}
-        onSelectAll={selectAll}
-        onDeselectAll={deselectAll}
-        onSelectOne={(_, row) => selectOne(row.id)}
-        onDeselectOne={(_, row) => deselectOne(row.id)}
-      />
+	return (
+		<>
+			<DataTable<ZoneResult>
+				columns={columns}
+				rows={rows}
+				selectable
+				selected={selected}
+				onSelectAll={selectAll}
+				onDeselectAll={deselectAll}
+				onSelectOne={(_, row) => selectOne(row.id)}
+				onDeselectOne={(_, row) => deselectOne(row.id)}
+			/>
 
-      {rows.length === 0 && (
-        <Box sx={{ p: 3 }}>
-          <Typography
-            color="text.secondary"
-            sx={{ textAlign: "center" }}
-            variant="body2"
-          >
-            Keine Zone gefunden
-          </Typography>
-        </Box>
-      )}
-    </>
-  );
+			{rows.length === 0 && (
+				<Box sx={{ p: 3 }}>
+					<Typography color="text.secondary" sx={{ textAlign: "center" }} variant="body2">
+						Keine Zone gefunden
+					</Typography>
+				</Box>
+			)}
+		</>
+	);
 }

@@ -27,7 +27,10 @@ export class CategoriesController {
       return cats;
     } catch (err) {
       console.error('Fehler in findAll():', err);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -36,17 +39,34 @@ export class CategoriesController {
   // -----------------------------------
   @Post()
   async create(
-    @Body() body: { name: string; categoryType: string; isVisible?: boolean },
+    @Body()
+    body: {
+      name: string;
+      categoryType: string;
+      isVisible?: boolean;
+      allowedRoles?: string[];
+    },
   ) {
     if (!body.name || !body.categoryType) {
-      throw new HttpException('name & categoryType required', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'name & categoryType required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     try {
-      const newCat = await this.categoriesService.createCategory(body);
+      const newCat = await this.categoriesService.createCategory({
+        name: body.name,
+        categoryType: body.categoryType,
+        isVisible: body.isVisible,
+        allowedRoles: body.allowedRoles ?? [], // <= hier
+      });
       return newCat;
     } catch (err) {
       console.error('Fehler in create():', err);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -58,10 +78,15 @@ export class CategoriesController {
   async markAsDeletedInDiscord(@Body() body: { discordCategoryId: string }) {
     // ACHTUNG: Wir nennen es im Body "discordCategoryId"
     if (!body.discordCategoryId) {
-      throw new HttpException('Missing discordCategoryId', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Missing discordCategoryId',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     try {
-      const res = await this.categoriesService.markAsDeletedInDiscord(body.discordCategoryId);
+      const res = await this.categoriesService.markAsDeletedInDiscord(
+        body.discordCategoryId,
+      );
       return { ok: true, data: res };
     } catch (err) {
       console.error('Fehler in markAsDeletedInDiscord:', err);
@@ -92,7 +117,10 @@ export class CategoriesController {
       return updated;
     } catch (err) {
       console.error('Fehler in update():', err);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -109,26 +137,33 @@ export class CategoriesController {
       return deleted;
     } catch (err) {
       console.error('Fehler in remove():', err);
-  
+
       // NEU: Wenn es schon eine HttpException ist, re-throw sie
       if (err instanceof HttpException) {
         throw err;
       }
-  
+
       // Sonst: 500
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
   @Patch('restore/:id')
   async restoreCategoryInDiscord(@Param('id') catId: string) {
     try {
-      const result = await this.categoriesService.restoreCategoryInDiscord(catId);
+      const result =
+        await this.categoriesService.restoreCategoryInDiscord(catId);
       return { ok: true, data: result };
     } catch (err) {
       console.error('Fehler in restoreCategoryInDiscord:', err);
 
       if (err instanceof HttpException) throw err;
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

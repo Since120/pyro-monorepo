@@ -18,13 +18,19 @@ export class CategoriesService {
   // -------------------------------------
   // 2) CREATE
   // -------------------------------------
-  async createCategory(data: { name: string; categoryType: string; isVisible?: boolean }) {
+  async createCategory(data: {
+    name: string;
+    categoryType: string;
+    isVisible?: boolean;
+    allowedRoles?: string[];
+  }) {
     // 1) DB-Eintrag erstellen
     const newCat = await this.prisma.category.create({
       data: {
         name: data.name,
         categoryType: data.categoryType,
         isVisible: data.isVisible ?? true,
+        allowedRoles: data.allowedRoles ?? [],
       },
     });
 
@@ -50,7 +56,7 @@ export class CategoriesService {
       console.error('Error while creating Discord category:', err);
       throw new HttpException(
         'Bot konnte die Discord-Kategorie nicht anlegen.',
-        HttpStatus.BAD_GATEWAY
+        HttpStatus.BAD_GATEWAY,
       );
     }
 
@@ -67,7 +73,7 @@ export class CategoriesService {
       categoryType: string;
       isVisible: boolean;
       allowedRoles: string[];
-    }>
+    }>,
   ) {
     // 1) DB => updaten
     const updated = await this.prisma.category.update({
@@ -80,7 +86,7 @@ export class CategoriesService {
       try {
         if (!updated.discordCategoryId) {
           console.warn(
-            `updateCategory: Category ${catId} hat keine discordCategoryId => Überspringe rename.`
+            `updateCategory: Category ${catId} hat keine discordCategoryId => Überspringe rename.`,
           );
         } else {
           const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
@@ -93,7 +99,7 @@ export class CategoriesService {
         console.error('Error while updating Discord category:', err);
         throw new HttpException(
           'Bot konnte die Discord-Kategorie nicht umbenennen.',
-          HttpStatus.BAD_GATEWAY
+          HttpStatus.BAD_GATEWAY,
         );
       }
     }
@@ -121,7 +127,7 @@ export class CategoriesService {
       // => Fehlermeldung, die wir im Frontend abfangen können
       throw new HttpException(
         'Kategorie kann nicht gelöscht werden, solange noch Zonen damit verknüpft sind!',
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
 
@@ -129,17 +135,19 @@ export class CategoriesService {
     if (cat.discordCategoryId) {
       try {
         const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
-        await axios.delete(`${botUrl}/discord/categories/${cat.discordCategoryId}`);
+        await axios.delete(
+          `${botUrl}/discord/categories/${cat.discordCategoryId}`,
+        );
       } catch (err) {
         console.error('Error while deleting Discord category:', err);
         throw new HttpException(
           'Bot konnte Discord-Kategorie nicht löschen.',
-          HttpStatus.BAD_GATEWAY
+          HttpStatus.BAD_GATEWAY,
         );
       }
     } else {
       console.warn(
-        `deleteCategory: Category ${catId} hat KEINE discordCategoryId => Nix zu löschen in Discord`
+        `deleteCategory: Category ${catId} hat KEINE discordCategoryId => Nix zu löschen in Discord`,
       );
     }
 
@@ -153,7 +161,10 @@ export class CategoriesService {
   // 5) MARK AS DELETED (Bot hat Category gelöscht)
   // -------------------------------------
   async markAsDeletedInDiscord(discordCategoryId: string) {
-    console.log('markAsDeletedInDiscord => discordCategoryId=', discordCategoryId);
+    console.log(
+      'markAsDeletedInDiscord => discordCategoryId=',
+      discordCategoryId,
+    );
 
     // 1) Datensatz finden
     const cat = await this.prisma.category.findFirst({
@@ -195,7 +206,7 @@ export class CategoriesService {
     if (!cat.deletedInDiscord) {
       throw new HttpException(
         'Kategorie ist gar nicht als gelöscht markiert.',
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
 
@@ -223,7 +234,7 @@ export class CategoriesService {
       console.error('restoreCategoryInDiscord -> Bot error:', err);
       throw new HttpException(
         'Bot konnte die Discord-Kategorie nicht neu anlegen.',
-        HttpStatus.BAD_GATEWAY
+        HttpStatus.BAD_GATEWAY,
       );
     }
   }

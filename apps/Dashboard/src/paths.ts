@@ -71,11 +71,11 @@ export const paths = {
 			create: "/dashboard/categories/create",
 			edit: (categoryId: string) => `/dashboard/categories/edit/${categoryId}`,
 			zones: {
-			  list: "/dashboard/categories/zones",
-			  create: "/dashboard/categories/zones/create",
-			  edit: (zoneId: string) => `/dashboard/categories/zones/edit/${zoneId}`,
+				list: "/dashboard/categories/zones",
+				create: "/dashboard/categories/zones/create",
+				edit: (zoneId: string) => `/dashboard/categories/zones/edit/${zoneId}`,
 			},
-		  },
+		},
 
 		calendar: "/dashboard/calendar",
 		chat: {

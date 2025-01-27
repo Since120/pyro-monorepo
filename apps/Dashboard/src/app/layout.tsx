@@ -1,12 +1,11 @@
 import * as React from "react";
 import type { Metadata, Viewport } from "next";
-
-// Wir importieren unseren NextAuth-Wrapper (Providers).
-import { Providers } from "./providers";
-
 import { Auth0Provider } from "@auth0/nextjs-auth0";
 import { ClerkProvider } from "@clerk/nextjs";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
+
+// Wir importieren unseren NextAuth-Wrapper (Providers).
+import { Providers } from "./providers";
 
 import "@/styles/global.css";
 
@@ -27,76 +26,76 @@ import { ThemeProvider } from "@/components/core/theme-provider";
 import { Toaster } from "@/components/core/toaster";
 
 export const metadata = {
-  title: appConfig.name,
+	title: appConfig.name,
 } satisfies Metadata;
 
 export const viewport = {
-  width: "device-width",
-  initialScale: 1,
-  themeColor: appConfig.themeColor,
+	width: "device-width",
+	initialScale: 1,
+	themeColor: appConfig.themeColor,
 } satisfies Viewport;
 
 // Dynamisch wählt das Template je nach config einen AuthProvider
 let AuthProvider: React.FC<React.PropsWithChildren> = React.Fragment;
 
 if (appConfig.authStrategy === AuthStrategy.AUTH0) {
-  AuthProvider = Auth0Provider as React.FC<React.PropsWithChildren>;
+	AuthProvider = Auth0Provider as React.FC<React.PropsWithChildren>;
 }
 if (appConfig.authStrategy === AuthStrategy.CLERK) {
-  AuthProvider = ClerkProvider as React.FC<React.PropsWithChildren>;
+	AuthProvider = ClerkProvider as React.FC<React.PropsWithChildren>;
 }
 if (appConfig.authStrategy === AuthStrategy.COGNITO) {
-  AuthProvider = CognitoProvider as React.FC<React.PropsWithChildren>;
+	AuthProvider = CognitoProvider as React.FC<React.PropsWithChildren>;
 }
 if (appConfig.authStrategy === AuthStrategy.CUSTOM) {
-  AuthProvider = CustomAuthProvider as React.FC<React.PropsWithChildren>;
+	AuthProvider = CustomAuthProvider as React.FC<React.PropsWithChildren>;
 }
 if (appConfig.authStrategy === AuthStrategy.SUPABASE) {
-  AuthProvider = SupabaseProvider as React.FC<React.PropsWithChildren>;
+	AuthProvider = SupabaseProvider as React.FC<React.PropsWithChildren>;
 }
 
 interface LayoutProps {
-  children: React.ReactNode;
+	children: React.ReactNode;
 }
 
 // WICHTIG: async function => wir können serverseitig "getSettings" aufrufen.
 export default async function Layout({ children }: LayoutProps): Promise<React.JSX.Element> {
-  const settings = await getPersistedSettings();
-  const direction = settings.direction ?? appConfig.direction;
-  const language = settings.language ?? appConfig.language;
+	const settings = await getPersistedSettings();
+	const direction = settings.direction ?? appConfig.direction;
+	const language = settings.language ?? appConfig.language;
 
-  return (
-    <html dir={direction} lang={language} suppressHydrationWarning>
-      <body>
-        <InitColorSchemeScript attribute="class" />
-        {/* 
+	return (
+		<html dir={direction} lang={language} suppressHydrationWarning>
+			<body>
+				<InitColorSchemeScript attribute="class" />
+				{/* 
           1) NextAuth SessionProvider einbinden: 
           Wir nutzen <Providers> als oberste Ebene,
           damit der restliche Code (AuthProvider, Analytics etc.)
           die session ggf. abrufen kann.
         */}
-        <Providers>
-          <AuthProvider>
-            <Analytics>
-              <LocalizationProvider>
-                <SettingsProvider settings={settings}>
-                  <I18nProvider lng={language}>
-                    <EmotionCacheProvider options={{ key: "mui" }}>
-                      <Rtl direction={direction}>
-                        <ThemeProvider>
-                          {children}
-                          <SettingsButton />
-                          <Toaster position="bottom-right" />
-                        </ThemeProvider>
-                      </Rtl>
-                    </EmotionCacheProvider>
-                  </I18nProvider>
-                </SettingsProvider>
-              </LocalizationProvider>
-            </Analytics>
-          </AuthProvider>
-        </Providers>
-      </body>
-    </html>
-  );
+				<Providers>
+					<AuthProvider>
+						<Analytics>
+							<LocalizationProvider>
+								<SettingsProvider settings={settings}>
+									<I18nProvider lng={language}>
+										<EmotionCacheProvider options={{ key: "mui" }}>
+											<Rtl direction={direction}>
+												<ThemeProvider>
+													{children}
+													<SettingsButton />
+													<Toaster position="bottom-right" />
+												</ThemeProvider>
+											</Rtl>
+										</EmotionCacheProvider>
+									</I18nProvider>
+								</SettingsProvider>
+							</LocalizationProvider>
+						</Analytics>
+					</AuthProvider>
+				</Providers>
+			</body>
+		</html>
+	);
 }

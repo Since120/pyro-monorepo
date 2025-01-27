@@ -40,5 +40,5 @@ pnpm studio
 ##  Typescript
 
 1.  **Neu ladne**
-    F1
     Developer: Reload Window
+

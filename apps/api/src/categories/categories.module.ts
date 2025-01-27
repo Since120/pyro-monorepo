@@ -6,8 +6,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 // Falls du das "PrismaService" in einem eigenen PrismaModule hast, importiere das hier.
 
 @Module({
-  imports: [PrismaModule], 
-  controllers: [CategoriesController, ],
+  imports: [PrismaModule],
+  controllers: [CategoriesController],
   providers: [CategoriesService],
   // Falls du PrismaService brauchst, add to providers or import {PrismaModule}:
   // imports: [PrismaModule],

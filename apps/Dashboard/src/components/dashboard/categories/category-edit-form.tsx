@@ -2,72 +2,143 @@
 
 import * as React from "react";
 import { useCallback, useState } from "react";
-import {
-  Box,
-  Stack,
-  Typography,
-  Radio,
-  RadioGroup,
-  FormControlLabel,
-  Button,
-  IconButton,
-  Popover,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  TextField,
-  Switch,
-  Autocomplete
-} from "@mui/material";
-
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-
-import { ArrowLeft as ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import dynamic from "next/dynamic";
+import {
+	Autocomplete,
+	Box,
+	Button,
+	FormControlLabel,
+	IconButton,
+	List,
+	ListItem,
+	ListItemButton,
+	ListItemText,
+	Popover,
+	Radio,
+	RadioGroup,
+	Stack,
+	Switch,
+	TextField,
+	Typography,
+} from "@mui/material";
+import { ArrowLeft as ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 
 // ---- DUMMY TYP-OPTIONEN (unverändert) ----
 const categoryOptions = [
-  {
-    title: "Allianz Ebene",
-    description: "Ein Zonenbereich für die Allianz eröffnen",
-    value: "freelancers",
-    disabled: false,
-  },
-  {
-    title: "Organisation Ebene",
-    description: "Eröffnet einen Zonenbereich für die Organisation",
-    value: "contractors",
-    disabled: false,
-  },
-  {
-    title: "Sub Organisation Ebene",
-    description: "Zonenbereich für die Suborganisation (Nicht Sichtbar für Nicht-Mitglieder)",
-    value: "employees",
-    disabled: false,
-  },
+	{
+		title: "Allianz Ebene",
+		description: "Ein Zonenbereich für die Allianz eröffnen",
+		value: "freelancers",
+		disabled: false,
+	},
+	{
+		title: "Organisation Ebene",
+		description: "Eröffnet einen Zonenbereich für die Organisation",
+		value: "contractors",
+		disabled: false,
+	},
+	{
+		title: "Sub Organisation Ebene",
+		description: "Zonenbereich für die Suborganisation (Nicht Sichtbar für Nicht-Mitglieder)",
+		value: "employees",
+		disabled: false,
+	},
 ] as const;
 
 // ---- LINIEN-Auswahl (unverändert) ----
 const LINES = [
-  "─", "──", "───", "────", "─────",
-  "═", "══", "═══", "════", "═════", "══════", "════════",
-  "╔", "╗", "╚", "╝", "╠", "╣", "╬",
-  "╔══", "══╗", "╚══", "══╝", "╠══", "══╣",
-  "█", "██", "███", "▓", "▒", "░",
-  "〓〓〓", "〓〓〓〓〓", "〓〓〓〓〓〓〓",
-  "━", "━━", "━━━━", "━━━━━", "┃",
-  "～", "〜", "〰", "﹏",
-  "꧁", "꧂",
-  "◆", "◇", "■", "□", "●", "○", "◎", "◉", "△", "▽",
-  "★", "☆", "✦", "✧", "✪", "✯", "✰",
-  "→", "⇒", "➜", "➤", "➔", "►", "➢", "➠",
-  "←", "⇐", "◄", "⬅",
-  "❀", "✿", "❃", "♥", "❤", "♡", "❥",
-  "♪", "♫", "♬", "♭", "♯",
-  "━━━━━━━━", "━━━━━━━━━━", "━━━━━━━━━━━━"
+	"─",
+	"──",
+	"───",
+	"────",
+	"─────",
+	"═",
+	"══",
+	"═══",
+	"════",
+	"═════",
+	"══════",
+	"════════",
+	"╔",
+	"╗",
+	"╚",
+	"╝",
+	"╠",
+	"╣",
+	"╬",
+	"╔══",
+	"══╗",
+	"╚══",
+	"══╝",
+	"╠══",
+	"══╣",
+	"█",
+	"██",
+	"███",
+	"▓",
+	"▒",
+	"░",
+	"〓〓〓",
+	"〓〓〓〓〓",
+	"〓〓〓〓〓〓〓",
+	"━",
+	"━━",
+	"━━━━",
+	"━━━━━",
+	"┃",
+	"～",
+	"〜",
+	"〰",
+	"﹏",
+	"꧁",
+	"꧂",
+	"◆",
+	"◇",
+	"■",
+	"□",
+	"●",
+	"○",
+	"◎",
+	"◉",
+	"△",
+	"▽",
+	"★",
+	"☆",
+	"✦",
+	"✧",
+	"✪",
+	"✯",
+	"✰",
+	"→",
+	"⇒",
+	"➜",
+	"➤",
+	"➔",
+	"►",
+	"➢",
+	"➠",
+	"←",
+	"⇐",
+	"◄",
+	"⬅",
+	"❀",
+	"✿",
+	"❃",
+	"♥",
+	"❤",
+	"♡",
+	"❥",
+	"♪",
+	"♫",
+	"♬",
+	"♭",
+	"♯",
+	"━━━━━━━━",
+	"━━━━━━━━━━",
+	"━━━━━━━━━━━━",
 ];
 
 // ---- EMOJI-PICKER (unverändert) ----
@@ -75,324 +146,320 @@ const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 // ---- DATEN-INTERFACE (unverändert) ----
 interface CategoryData {
-  id: string;
-  categoryType: string; // z.B. "freelancers"
-  name: string;         // z.B. "═══ Mining 🛠️ ═════════"
-  tags: string[];       // ["FPS Team", "Releas the Quaken"]
-  isVisible: boolean;   // z.B. true
+	id: string;
+	categoryType: string; // z.B. "freelancers"
+	name: string; // z.B. "═══ Mining 🛠️ ═════════"
+	tags: string[]; // ["FPS Team", "Releas the Quaken"]
+	isVisible: boolean; // z.B. true
 }
 
 interface CategoryEditFormProps {
-  category: CategoryData;
+	category: CategoryData;
 }
 
 /** Einfache Edit-Form in einer Seite */
 export function CategoryEditForm({ category }: CategoryEditFormProps) {
-  const router = useRouter();
+	const router = useRouter();
+	const [roles, setRoles] = useState<{ id: string; name: string }[]>([]);
+	// 1) State: Category Type
+	const [categoryType, setCategoryType] = useState(category.categoryType);
 
-  // 1) State: Category Type
-  const [categoryType, setCategoryType] = useState(category.categoryType);
+	// 2) State: Category Name
+	const [name, setName] = useState(category.name);
 
-  // 2) State: Category Name
-  const [name, setName] = useState(category.name);
+	// 3) State: Tags
+	// Wir speichern sie als Set<string>, konvertieren für Autocomplete zu string[]
+	const [tags, setTags] = useState<Set<string>>(new Set(category.tags));
 
-  // 3) State: Tags
-  // Wir speichern sie als Set<string>, konvertieren für Autocomplete zu string[]
-  const [tags, setTags] = useState<Set<string>>(new Set(category.tags));
+	// 4) State: Sichtbarkeit
+	const [isVisible, setIsVisible] = useState<boolean>(category.isVisible);
 
-  // 4) State: Sichtbarkeit
-  const [isVisible, setIsVisible] = useState<boolean>(category.isVisible);
+	// Popover-States für Emoji und Linien
+	const [emojiAnchor, setEmojiAnchor] = React.useState<HTMLButtonElement | null>(null);
+	const [linesAnchor, setLinesAnchor] = React.useState<HTMLButtonElement | null>(null);
 
-  // Popover-States für Emoji und Linien
-  const [emojiAnchor, setEmojiAnchor] = React.useState<HTMLButtonElement | null>(null);
-  const [linesAnchor, setLinesAnchor] = React.useState<HTMLButtonElement | null>(null);
+	// Popover-Logik (unverändert)
+	const openEmojiPopover = (e: React.MouseEvent<HTMLButtonElement>) => {
+		setEmojiAnchor(e.currentTarget);
+	};
+	const closeEmojiPopover = () => {
+		setEmojiAnchor(null);
+	};
 
-  // Popover-Logik (unverändert)
-  const openEmojiPopover = (e: React.MouseEvent<HTMLButtonElement>) => {
-    setEmojiAnchor(e.currentTarget);
-  };
-  const closeEmojiPopover = () => {
-    setEmojiAnchor(null);
-  };
+	const openLinesPopover = (e: React.MouseEvent<HTMLButtonElement>) => {
+		setLinesAnchor(e.currentTarget);
+	};
+	const closeLinesPopover = () => {
+		setLinesAnchor(null);
+	};
 
-  const openLinesPopover = (e: React.MouseEvent<HTMLButtonElement>) => {
-    setLinesAnchor(e.currentTarget);
-  };
-  const closeLinesPopover = () => {
-    setLinesAnchor(null);
-  };
+	const handleEmojiClick = (emojiData: { emoji: string }) => {
+		setName((prev) => prev + " " + emojiData.emoji);
+	};
 
-  const handleEmojiClick = (emojiData: { emoji: string }) => {
-    setName((prev) => prev + " " + emojiData.emoji);
-  };
+	const handleLineInsert = (line: string) => {
+		setName((prev) => prev + " " + line);
+		closeLinesPopover();
+	};
 
-  const handleLineInsert = (line: string) => {
-    setName((prev) => prev + " " + line);
-    closeLinesPopover();
-  };
+	// NEU: useEffect => Rollen laden
+	React.useEffect(() => {
+		fetch(`${process.env.NEXT_PUBLIC_API_URL}/roles`)
+			.then((res) => res.json())
+			.then((data) => {
+				// data = { roles: [ {id: '111', name: 'Admins'}, … ] }
+				setRoles(data.roles || []);
+			})
+			.catch((err) => {
+				console.error("Fehler beim Laden der Discord-Rollen:", err);
+			});
+	}, []);
 
-  // Handler für das Autocomplete: 
-  // newValue ist ein string[] => wir packen es in ein Set
-  const handleTagsChange = (event: unknown, newValue: string[]) => {
-    setTags(new Set(newValue));
-  };
+	// Handler für das Autocomplete:
+	// newValue ist ein string[] => wir packen es in ein Set
+	const handleTagsChange = (event: unknown, newValue: string[]) => {
+		setTags(new Set(newValue));
+	};
 
-  // Handler: Speichern
-  const handleSave = useCallback(async () => {
-    try {
-      const payload = {
-        name,
-        categoryType,
-        isVisible,
-        // tags => falls du "allowedRoles" in DB nimmst, anpassen:
-        allowedRoles: Array.from(tags), 
-      };
-  
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-      const res = await fetch(`${baseUrl}/categories/${category.id}`, {
-      method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-  
-      if (!res.ok) {
-        const errData = await res.json();
-        alert(`Fehler beim Update: ${errData.error ?? res.statusText}`);
-        return;
-      }
-  
-      const updated = await res.json();
-      router.push("/dashboard/categories");
-    } catch (err) {
-      console.error("handleSave error:", err);
-      alert("Unerwarteter Fehler beim Update: " + String(err));
-    }
-  }, [category.id, name, categoryType, isVisible, tags, router]);
-  
+	// Handler: Speichern
+	const handleSave = useCallback(async () => {
+		try {
+			const payload = {
+				name,
+				categoryType,
+				isVisible,
+				// tags => falls du "allowedRoles" in DB nimmst, anpassen:
+				allowedRoles: Array.from(tags),
+			};
 
-  // Handler: Löschen
-  const handleDelete = useCallback(async () => {
-    const confirmed = window.confirm("Wirklich löschen?");
-    if (!confirmed) return;
+			const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+			const res = await fetch(`${baseUrl}/categories/${category.id}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
 
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-      const res = await fetch(`${baseUrl}/categories/${category.id}`, {
-        method: "DELETE",
-      });
+			if (!res.ok) {
+				const errData = await res.json();
+				alert(`Fehler beim Update: ${errData.error ?? res.statusText}`);
+				return;
+			}
 
-      if (!res.ok) {
-        // NEU: Fehlermeldung parsen
-        const errData = await res.json().catch(() => null);
-        // Falls JSON parse schief geht, fallback: res.statusText
-        const msg = errData?.message || errData?.error || res.statusText;
-        alert(`Fehler beim Löschen: ${msg}`);
-        return;
-      }
+			const updated = await res.json();
+			router.push("/dashboard/categories");
+		} catch (err) {
+			console.error("handleSave error:", err);
+			alert("Unerwarteter Fehler beim Update: " + String(err));
+		}
+	}, [category.id, name, categoryType, isVisible, tags, router]);
 
-      router.push("/dashboard/categories");
-    } catch (err) {
-      console.error("handleDelete error:", err);
-      alert("Fehler beim Löschen: " + String(err));
-    }
-  }, [category.id, router]);
+	// Handler: Löschen
+	const handleDelete = useCallback(async () => {
+		const confirmed = window.confirm("Wirklich löschen?");
+		if (!confirmed) return;
 
-  
-  
+		try {
+			const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+			const res = await fetch(`${baseUrl}/categories/${category.id}`, {
+				method: "DELETE",
+			});
 
-  return (
-    <Stack spacing={4}>
-      {/* Kategorietyp */}
-      <Stack spacing={3}>
-        <div>
-          <Typography variant="h6">Kategorie-Typ</Typography>
-        </div>
-        <RadioGroup
-          onChange={(e) => setCategoryType(e.target.value)}
-          value={categoryType}
-          sx={{
-            "& .MuiFormControlLabel-root": {
-              border: "1px solid var(--mui-palette-divider)",
-              borderRadius: 1,
-              gap: 2,
-              p: 2,
-              position: "relative",
-              "&::before": {
-                borderRadius: "inherit",
-                bottom: 0,
-                content: '" "',
-                left: 0,
-                pointerEvents: "none",
-                position: "absolute",
-                right: 0,
-                top: 0,
-              },
-              "&.Mui-disabled": {
-                bgcolor: "var(--mui-palette-background-level1)",
-              },
-            },
-          }}
-        >
-          {categoryOptions.map((option) => (
-            <FormControlLabel
-              key={option.value}
-              control={<Radio />}
-              value={option.value}
-              disabled={option.disabled}
-              label={
-                <div>
-                  <Typography
-                    variant="inherit"
-                    sx={{
-                      color: option.disabled
-                        ? "var(--mui-palette-action-disabled)"
-                        : "var(--mui-palette-text-primary)",
-                    }}
-                  >
-                    {option.title}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: option.disabled
-                        ? "var(--mui-palette-action-disabled)"
-                        : "var(--mui-palette-text-secondary)",
-                    }}
-                  >
-                    {option.description}
-                  </Typography>
-                </div>
-              }
-              sx={{
-                ...(option.value === categoryType && {
-                  "&::before": {
-                    boxShadow: "0 0 0 2px var(--mui-palette-primary-main)",
-                  },
-                }),
-              }}
-            />
-          ))}
-        </RadioGroup>
-      </Stack>
+			if (!res.ok) {
+				// NEU: Fehlermeldung parsen
+				const errData = await res.json().catch(() => null);
+				// Falls JSON parse schief geht, fallback: res.statusText
+				const msg = errData?.message || errData?.error || res.statusText;
+				alert(`Fehler beim Löschen: ${msg}`);
+				return;
+			}
 
-      {/* Kategorie-Name + Buttons (Emoji + Linien) + Hinweis */}
-      <Stack spacing={3}>
-        <div>
-          <Typography variant="h6">Kategorie Details</Typography>
-        </div>
+			router.push("/dashboard/categories");
+		} catch (err) {
+			console.error("handleDelete error:", err);
+			alert("Fehler beim Löschen: " + String(err));
+		}
+	}, [category.id, router]);
 
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1}
-          alignItems={{ xs: "stretch", sm: "flex-end" }}
-        >
-          <TextField
-            variant="outlined"
-            label="Kategorie Name"
-            name="categoryTitle"
-            placeholder="z.B. '═══ Mining 🛠️ ═════════'"
-            value={name}
-            onChange={(e) => {
-              // 1) uppercase
-              let newVal = e.target.value.toUpperCase();
-              // 2) max 40 Zeichen
-              if (newVal.length > 25) {
-                newVal = newVal.slice(0, 25);
-              }
-              setName(newVal);
-            }}
-            inputProps={{
-              maxLength: 25,         // HTML5-Attribute
-              style: { textTransform: "uppercase" },
-            }}
-            sx={{ flex: 1 }}
-          />
+	return (
+		<Stack spacing={4}>
+			{/* Kategorietyp */}
+			<Stack spacing={3}>
+				<div>
+					<Typography variant="h6">Kategorie-Typ</Typography>
+				</div>
+				<RadioGroup
+					onChange={(e) => setCategoryType(e.target.value)}
+					value={categoryType}
+					sx={{
+						"& .MuiFormControlLabel-root": {
+							border: "1px solid var(--mui-palette-divider)",
+							borderRadius: 1,
+							gap: 2,
+							p: 2,
+							position: "relative",
+							"&::before": {
+								borderRadius: "inherit",
+								bottom: 0,
+								content: '" "',
+								left: 0,
+								pointerEvents: "none",
+								position: "absolute",
+								right: 0,
+								top: 0,
+							},
+							"&.Mui-disabled": {
+								bgcolor: "var(--mui-palette-background-level1)",
+							},
+						},
+					}}
+				>
+					{categoryOptions.map((option) => (
+						<FormControlLabel
+							key={option.value}
+							control={<Radio />}
+							value={option.value}
+							disabled={option.disabled}
+							label={
+								<div>
+									<Typography
+										variant="inherit"
+										sx={{
+											color: option.disabled ? "var(--mui-palette-action-disabled)" : "var(--mui-palette-text-primary)",
+										}}
+									>
+										{option.title}
+									</Typography>
+									<Typography
+										variant="body2"
+										sx={{
+											color: option.disabled
+												? "var(--mui-palette-action-disabled)"
+												: "var(--mui-palette-text-secondary)",
+										}}
+									>
+										{option.description}
+									</Typography>
+								</div>
+							}
+							sx={{
+								...(option.value === categoryType && {
+									"&::before": {
+										boxShadow: "0 0 0 2px var(--mui-palette-primary-main)",
+									},
+								}),
+							}}
+						/>
+					))}
+				</RadioGroup>
+			</Stack>
 
-          {/* Emoji/Linien Buttons */}
-          <Stack direction="row" spacing={1}>
-            <IconButton onClick={openEmojiPopover}>
-              <EmojiEmotionsIcon />
-            </IconButton>
-            <Popover
-              open={Boolean(emojiAnchor)}
-              anchorEl={emojiAnchor}
-              onClose={closeEmojiPopover}
-              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-            >
-              <Box sx={{ p: 1 }}>
-                <EmojiPicker onEmojiClick={handleEmojiClick} />
-              </Box>
-            </Popover>
+			{/* Kategorie-Name + Buttons (Emoji + Linien) + Hinweis */}
+			<Stack spacing={3}>
+				<div>
+					<Typography variant="h6">Kategorie Details</Typography>
+				</div>
 
-            <IconButton onClick={openLinesPopover}>
-              <MoreHorizIcon />
-            </IconButton>
-            <Popover
-              open={Boolean(linesAnchor)}
-              anchorEl={linesAnchor}
-              onClose={closeLinesPopover}
-              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-            >
-              <List dense sx={{ minWidth: 100 }}>
-                {LINES.map((line) => (
-                  <ListItem key={line} disablePadding>
-                    <ListItemButton onClick={() => handleLineInsert(line)}>
-                      <ListItemText primary={line} />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            </Popover>
-          </Stack>
-        </Stack>
+				<Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "flex-end" }}>
+					<TextField
+						variant="outlined"
+						label="Kategorie Name"
+						name="categoryTitle"
+						placeholder="z.B. '═══ Mining 🛠️ ═════════'"
+						value={name}
+						onChange={(e) => {
+							// 1) uppercase
+							let newVal = e.target.value.toUpperCase();
+							// 2) max 40 Zeichen
+							if (newVal.length > 25) {
+								newVal = newVal.slice(0, 25);
+							}
+							setName(newVal);
+						}}
+						inputProps={{
+							maxLength: 25, // HTML5-Attribute
+							style: { textTransform: "uppercase" },
+						}}
+						sx={{ flex: 1 }}
+					/>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
-          Hinweis: Kategorien in Discord werden grundsätzlich in GROSSBUCHSTABEN angezeigt.
-        </Typography>
+					{/* Emoji/Linien Buttons */}
+					<Stack direction="row" spacing={1}>
+						<IconButton onClick={openEmojiPopover}>
+							<EmojiEmotionsIcon />
+						</IconButton>
+						<Popover
+							open={Boolean(emojiAnchor)}
+							anchorEl={emojiAnchor}
+							onClose={closeEmojiPopover}
+							anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+						>
+							<Box sx={{ p: 1 }}>
+								<EmojiPicker onEmojiClick={handleEmojiClick} />
+							</Box>
+						</Popover>
 
-        {/* Autocomplete für Tags (Access) */}
-        <Box>
-          <Autocomplete
-            multiple
-            freeSolo
-            options={["Releas the Quaken", "FPS Team"]} // Dummy-Optionen
-            value={[...tags]} // Konvertiere Set -> Array
-            onChange={handleTagsChange}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                variant="outlined"
-                label="Wer hat Zugang?"
-                placeholder="Tippe und drücke Enter"
-              />
-            )}
-          />
-        </Box>
-      </Stack>
+						<IconButton onClick={openLinesPopover}>
+							<MoreHorizIcon />
+						</IconButton>
+						<Popover
+							open={Boolean(linesAnchor)}
+							anchorEl={linesAnchor}
+							onClose={closeLinesPopover}
+							anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+						>
+							<List dense sx={{ minWidth: 100 }}>
+								{LINES.map((line) => (
+									<ListItem key={line} disablePadding>
+										<ListItemButton onClick={() => handleLineInsert(line)}>
+											<ListItemText primary={line} />
+										</ListItemButton>
+									</ListItem>
+								))}
+							</List>
+						</Popover>
+					</Stack>
+				</Stack>
 
-      {/* Switch: Sichtbarkeit */}
-      <Stack spacing={2}>
-        <Typography variant="h6">Optionen</Typography>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={isVisible}
-              onChange={(e) => setIsVisible(e.target.checked)}
-            />
-          }
-          label="Kategorie Sichtbar?"
-        />
-      </Stack>
+				<Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
+					Hinweis: Kategorien in Discord werden grundsätzlich in GROSSBUCHSTABEN angezeigt.
+				</Typography>
 
-      {/* Footer: Buttons „Löschen“ / „Speichern“ */}
-      <Stack direction="row" spacing={2} justifyContent="flex-end">
-        <Button color="error" variant="outlined" onClick={handleDelete}>
-          Löschen
-        </Button>
-        <Button variant="contained" onClick={handleSave}>
-          Änderungen speichern
-        </Button>
-      </Stack>
-    </Stack>
-  );
+				{/* Autocomplete für Tags (Access) */}
+				<Box>
+					<Autocomplete
+						multiple
+						options={roles}
+						getOptionLabel={(r) => r.name}
+						value={roles.filter((r) => tags.has(r.id))}
+						onChange={(_event, newRoleObjects) => {
+							const newIds = newRoleObjects.map((r) => r.id);
+							setTags(new Set(newIds));
+						}}
+						freeSolo={false}
+						isOptionEqualToValue={(option, value) => option.id === value.id}
+						renderInput={(params) => <TextField {...params} variant="outlined" label="Wer hat Zugang?" />}
+					/>
+				</Box>
+			</Stack>
+
+			{/* Switch: Sichtbarkeit */}
+			<Stack spacing={2}>
+				<Typography variant="h6">Optionen</Typography>
+				<FormControlLabel
+					control={<Switch checked={isVisible} onChange={(e) => setIsVisible(e.target.checked)} />}
+					label="Kategorie Sichtbar?"
+				/>
+			</Stack>
+
+			{/* Footer: Buttons „Löschen“ / „Speichern“ */}
+			<Stack direction="row" spacing={2} justifyContent="flex-end">
+				<Button color="error" variant="outlined" onClick={handleDelete}>
+					Löschen
+				</Button>
+				<Button variant="contained" onClick={handleSave}>
+					Änderungen speichern
+				</Button>
+			</Stack>
+		</Stack>
+	);
 }

@@ -7,6 +7,7 @@ import {
   renameDiscordCategory,
   removeDiscordCategory
 } from "./services/discordCategorySync";
+import { client } from "./index"; // Beispiel: Pfad anpassen
 
 /**
  * Startet einen kleinen HTTP-Server im Bot,
@@ -83,6 +84,34 @@ export function startBotHttpServer() {
       return res.status(200).json({ ok: true });
     } catch (err) {
       logger.error("[Bot] removeDiscordCategory Error:", err);
+      return res.status(500).json({ error: "Internal Bot Error" });
+    }
+  });
+
+  app.get("/discord/roles", async (req, res) => {
+    try {
+      const guildId = process.env.GUILD_ID;
+      if (!guildId) {
+        return res.status(400).json({ error: "GUILD_ID missing in .env" });
+      }
+
+      // Gilde aus dem Bot-Cache holen:
+      const guild = client.guilds.cache.get(guildId);
+      if (!guild) {
+        return res.status(404).json({ error: `Guild ${guildId} not found` });
+      }
+
+      // Typisieren: "r: any" oder (besser) "r: Role" aus discord.js
+      const roles = guild.roles.cache.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        color: r.hexColor,
+        position: r.position,
+      }));
+
+      return res.json({ roles });
+    } catch (err) {
+      logger.error("GET /discord/roles Error:", err);
       return res.status(500).json({ error: "Internal Bot Error" });
     }
   });

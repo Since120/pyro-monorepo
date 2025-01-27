@@ -2,14 +2,13 @@
 
 /** Der Haupt-Typ, den unsere Tabelle anzeigt */
 export interface ZoneResult {
-    id: string;
-    zoneKey: string;
-    zoneName: string;
-    minutesRequired: number;
-    pointsGranted: number;
-    totalSecondsInZone: number;
-    categoryName: string | null;
-    lastUsage: Date | null;
-    categoryDeletedInDiscord?: boolean;
-  }
-  
+	id: string;
+	zoneKey: string;
+	zoneName: string;
+	minutesRequired: number;
+	pointsGranted: number;
+	totalSecondsInZone: number;
+	categoryName: string | null;
+	lastUsage: Date | null;
+	categoryDeletedInDiscord?: boolean;
+}

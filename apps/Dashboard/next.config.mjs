@@ -2,7 +2,7 @@
 const config = {
 	experimental: {
 		esmExternals: "loose",
-		appDir: true
+		appDir: true,
 	},
 };
 

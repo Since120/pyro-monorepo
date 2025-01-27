@@ -33,7 +33,7 @@ export class ZonesService {
         // => API-Fehler => 400
         throw new HttpException(
           'Kann Zone nicht erstellen, da Category nicht existiert.',
-          HttpStatus.BAD_REQUEST
+          HttpStatus.BAD_REQUEST,
         );
       }
     }
@@ -59,7 +59,7 @@ export class ZonesService {
       minutesRequired: number;
       pointsGranted: number;
       categoryId?: string | null;
-    }>
+    }>,
   ) {
     // Optional: Auch hier checken, ob categoryId existiert
     if (data.categoryId) {
@@ -69,7 +69,7 @@ export class ZonesService {
       if (!cat) {
         throw new HttpException(
           'Kann Zone nicht updaten, da Category nicht existiert.',
-          HttpStatus.BAD_REQUEST
+          HttpStatus.BAD_REQUEST,
         );
       }
     }
