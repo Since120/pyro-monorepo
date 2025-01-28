@@ -10,7 +10,6 @@ import { List as ListIcon } from "@phosphor-icons/react/dist/ssr/List";
 
 import { Sidebar } from "./sidebar";
 import type { CategoryItem } from "./types";
-// NEU: importiere deine “Zonen”-Komponente
 import { ZonesPageClient } from "./zones/zones-page-client";
 
 export interface CategoriesViewProps {
@@ -33,6 +32,10 @@ export function CategoriesView({ categories }: CategoriesViewProps) {
 	const handleCategorySelect = React.useCallback((catId: string | null) => {
 		setSelectedCatId(catId);
 	}, []);
+
+	const selectedCategory = selectedCatId
+    ? categories.find((c) => c.id === selectedCatId)
+    : null;
 
 	return (
 		<Box sx={{ display: "flex", flex: "1 1 0", minHeight: 0 }}>

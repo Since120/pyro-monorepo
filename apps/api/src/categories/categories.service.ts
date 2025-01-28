@@ -14,7 +14,6 @@ export class CategoriesService {
   findAll() {
     return this.prisma.category.findMany();
   }
-
   // -------------------------------------
   // 2) CREATE
   // -------------------------------------
