@@ -3,9 +3,9 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-    "migrate:dev": "prisma migrate dev",
+    "dev:migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "generate:dev": "prisma generate dev",
+    "dev:generate": "prisma generate dev",
     "studio": "prisma studio --schema ./schema.prisma"
 
   },

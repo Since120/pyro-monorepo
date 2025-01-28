@@ -45,6 +45,8 @@ export class CategoriesController {
       categoryType: string;
       isVisible?: boolean;
       allowedRoles?: string[];
+      trackingActive?: boolean;
+      sendSetup?: boolean;
     },
   ) {
     if (!body.name || !body.categoryType) {
@@ -58,7 +60,9 @@ export class CategoriesController {
         name: body.name,
         categoryType: body.categoryType,
         isVisible: body.isVisible,
-        allowedRoles: body.allowedRoles ?? [], // <= hier
+        allowedRoles: body.allowedRoles ?? [],
+        trackingActive: body.trackingActive,
+        sendSetup: body.sendSetup,
       });
       return newCat;
     } catch (err) {
@@ -107,13 +111,22 @@ export class CategoriesController {
       categoryType?: string;
       isVisible?: boolean;
       allowedRoles?: string[];
+      trackingActive?: boolean;
+      sendSetup?: boolean;
     },
   ) {
     if (!catId) {
       throw new HttpException('Missing categoryId', HttpStatus.BAD_REQUEST);
     }
     try {
-      const updated = await this.categoriesService.updateCategory(catId, body);
+      const updated = await this.categoriesService.updateCategory(catId, {
+        name: body.name,
+        categoryType: body.categoryType,
+        isVisible: body.isVisible,
+        allowedRoles: body.allowedRoles,
+        trackingActive: body.trackingActive, // NEU
+        sendSetup: body.sendSetup,           // NEU
+      });
       return updated;
     } catch (err) {
       console.error('Fehler in update():', err);

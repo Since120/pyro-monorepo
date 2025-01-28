@@ -4,6 +4,8 @@
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getCategories } from "@/services/categories";
+import { deleteZone, updateZone } from "@/services/zones";
 import Button from "@mui/material/Button";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
@@ -40,12 +42,7 @@ export function ZoneEditForm({ zone }: { zone: ZoneData }) {
 	useEffect(() => {
 		async function loadCategories() {
 			try {
-				const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004";
-				const res = await fetch(`${baseUrl}/categories`);
-				if (!res.ok) {
-					throw new Error(`Fehler beim Laden der Kategorien: ${res.status} ${res.statusText}`);
-				}
-				const data = await res.json();
+				const data = await getCategories();
 				const mapped = data.map((cat: any) => ({
 					id: cat.id,
 					name: cat.name,
@@ -61,27 +58,7 @@ export function ZoneEditForm({ zone }: { zone: ZoneData }) {
 	// 2) Speichern => PATCH /zones/:id (NestJS)
 	const handleSave = useCallback(async () => {
 		try {
-			const payload = {
-				zoneKey,
-				zoneName,
-				minutesRequired,
-				pointsGranted,
-				categoryId,
-			};
-
-			const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004";
-			const res = await fetch(`${baseUrl}/zones/${zone.id}`, {
-				method: "PATCH",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-
-			if (!res.ok) {
-				const errData = await res.json().catch(() => null);
-				const msg = errData?.message || errData?.error || res.statusText;
-				alert(`Fehler beim Update: ${msg}`);
-				return;
-			}
+			await updateZone(zone.id, { zoneKey, zoneName, minutesRequired, pointsGranted, categoryId });
 
 			router.push("/dashboard/categories");
 		} catch (error) {
@@ -96,18 +73,7 @@ export function ZoneEditForm({ zone }: { zone: ZoneData }) {
 		if (!confirmed) return;
 
 		try {
-			const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004";
-			const res = await fetch(`${baseUrl}/zones/${zone.id}`, {
-				method: "DELETE",
-			});
-
-			if (!res.ok) {
-				const errData = await res.json().catch(() => null);
-				const msg = errData?.message || errData?.error || res.statusText;
-				alert(`Fehler beim Löschen: ${msg}`);
-				return;
-			}
-
+			await deleteZone(zone.id);
 			router.push("/dashboard/categories");
 		} catch (error) {
 			console.error("handleDelete error:", error);

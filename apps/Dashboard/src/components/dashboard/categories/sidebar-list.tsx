@@ -3,6 +3,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { restoreCategory } from "@/services/categories";
 import { Box, Button, Collapse, Divider, IconButton, Stack, Typography } from "@mui/material";
 import { NotePencil as NotePencilIcon } from "@phosphor-icons/react/dist/ssr/NotePencil";
 
@@ -61,16 +62,7 @@ function SidebarListItem({ category, selected, onToggle }: SidebarListItemProps)
 			if (!confirmed) return;
 
 			try {
-				const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-				const res = await fetch(`${baseUrl}/categories/restore/${category.id}`, {
-					method: "PATCH",
-				});
-				if (!res.ok) {
-					const errData = await res.json().catch(() => null);
-					const msg = errData?.message || errData?.error || res.statusText;
-					alert(`Fehler beim Wiederherstellen: ${msg}`);
-					return;
-				}
+				await restoreCategory(category.id);
 				// Erfolg => Optional: Reload page or refresh data
 				alert("Kategorie wurde wiederhergestellt!");
 				window.location.reload();

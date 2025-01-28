@@ -23,6 +23,8 @@ export class CategoriesService {
     categoryType: string;
     isVisible?: boolean;
     allowedRoles?: string[];
+    trackingActive?: boolean;
+    sendSetup?: boolean;
   }) {
     // 1) DB-Eintrag erstellen
     const newCat = await this.prisma.category.create({
@@ -31,6 +33,8 @@ export class CategoriesService {
         categoryType: data.categoryType,
         isVisible: data.isVisible ?? true,
         allowedRoles: data.allowedRoles ?? [],
+        trackingActive: data.trackingActive ?? false,
+        sendSetup: data.sendSetup ?? false,
       },
     });
 
@@ -73,6 +77,8 @@ export class CategoriesService {
       categoryType: string;
       isVisible: boolean;
       allowedRoles: string[];
+      trackingActive: boolean;
+      sendSetup: boolean;
     }>,
   ) {
     // 1) DB => updaten

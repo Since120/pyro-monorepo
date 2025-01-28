@@ -5,6 +5,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getCategories } from "@/services/categories";
+import { getZones } from "@/services/zones";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
@@ -37,12 +39,7 @@ export function ZonesPageClient() {
 				setLoading(true);
 				setError(null);
 
-				const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-				const res = await fetch(`${baseUrl}/zones`);
-				if (!res.ok) {
-					throw new Error(`Error ${res.status} ${res.statusText}`);
-				}
-				const data = await res.json();
+				const data = await getZones();
 
 				const mapped: ZoneResult[] = data.map((z: any) => ({
 					id: z.id,
@@ -96,13 +93,7 @@ export function ZonesPageClient() {
 	// 4) NEUE ZONE ANLEGEN => Vorher checken, ob mind. 1 Kategorie existiert
 	const handleCreateZone = React.useCallback(async () => {
 		try {
-			const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-			// CATEGORIES abfragen
-			const catRes = await fetch(`${baseUrl}/categories`);
-			if (!catRes.ok) {
-				throw new Error(`Fehler beim Laden der Kategorien (Status ${catRes.status})`);
-			}
-			const catData = await catRes.json();
+			const catData = await getCategories();
 
 			// Prüfen, ob catData.length > 0
 			if (!Array.isArray(catData) || catData.length === 0) {

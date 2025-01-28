@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { bulkDeleteZones } from "@/services/zones";
 import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
 import FormControl from "@mui/material/FormControl";
@@ -81,17 +82,8 @@ export function ZonesFilters({
 			return;
 		}
 
-		const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 		try {
-			const res = await fetch(`${baseUrl}/zones/bulk-delete`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ zoneIds: idsToDelete }),
-			});
-			if (!res.ok) {
-				console.error("Fehler beim Bulk-Löschen");
-				return;
-			}
+			await bulkDeleteZones(idsToDelete);
 
 			// Nach Erfolg rufen wir dein Parent-Callback auf, wenn vorhanden
 			if (onZonesDeleted) {

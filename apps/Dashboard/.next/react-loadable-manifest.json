@@ -39,14 +39,8 @@
       "static/chunks/_app-pages-browser_node_modules_pnpm_next_15_1_4__babel_core_7_26_7_babel-plugin-macros_3_1_0-711902.js"
     ]
   },
-  "components\\dashboard\\categories\\category-edit-form.tsx -> emoji-picker-react": {
-    "id": "components\\dashboard\\categories\\category-edit-form.tsx -> emoji-picker-react",
-    "files": [
-      "static/chunks/_app-pages-browser_node_modules_pnpm_emoji-picker-react_4_12_0_react_19_0_0_node_modules_emoj-f9d6b1.js"
-    ]
-  },
-  "components\\dashboard\\categories\\create\\category-details-step.tsx -> emoji-picker-react": {
-    "id": "components\\dashboard\\categories\\create\\category-details-step.tsx -> emoji-picker-react",
+  "components\\dashboard\\categories\\shared\\NameFieldSection.tsx -> emoji-picker-react": {
+    "id": "components\\dashboard\\categories\\shared\\NameFieldSection.tsx -> emoji-picker-react",
     "files": [
       "static/chunks/_app-pages-browser_node_modules_pnpm_emoji-picker-react_4_12_0_react_19_0_0_node_modules_emoj-f9d6b1.js"
     ]

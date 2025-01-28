@@ -5,7 +5,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import { appConfig } from "@/config/app";
-import { CategoryCreateForm } from "@/components/dashboard/categories/create/category-create-form";
+import { CategoryWizard } from "@/components/dashboard/categories/create-wizard/CategoryWizard";
 
 export const metadata = {
 	title: `Create | Category | Dashboard | ${appConfig.name}`,
@@ -36,7 +36,7 @@ export default function Page(): React.JSX.Element {
 			<Box sx={{ flex: "1 1 auto", overflowY: "auto", p: { xs: 4, sm: 6, md: 8 } }}>
 				<Stack maxWidth="md" spacing={4}>
 					<Typography variant="h4">Neue Kategorie Erstellen</Typography>
-					<CategoryCreateForm />
+					<CategoryWizard />
 				</Stack>
 			</Box>
 		</Box>

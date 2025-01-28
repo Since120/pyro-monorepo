@@ -8,7 +8,7 @@ import Typography from "@mui/material/Typography";
 import { ArrowLeft as ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
 
 import { prisma } from "@/lib/prisma"; // PFAD anpassen
-import { CategoryEditForm } from "@/components/dashboard/categories/category-edit-form";
+import { CategoryEditForm } from "@/components/dashboard/categories/category-edit-form/category-edit-form";
 
 export const metadata: Metadata = {
 	title: "Kategorie bearbeiten",

@@ -21,6 +21,8 @@ model Category {
   categoryType        String
   allowedRoles        String[] @default([])
   isVisible           Boolean  @default(true)
+  trackingActive      Boolean  @default(false)   
+  sendSetup           Boolean  @default(false)
   lastUsage           DateTime?
   totalSecondsInCateg Int      @default(0)
   createdAt           DateTime @default(now())

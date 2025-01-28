@@ -8,8 +8,8 @@
 		"dev:dash": "pnpm --filter pyro-dashboard dev",
 		"dev:api": "pnpm --filter pyro-api start:dev",
 		"studio": "pnpm --filter pyro-prisma run studio",
-		"generate": "pnpm --filter pyro-prisma prisma generate --schema ./schema.prisma",
-		"migrate": "pnpm --filter pyro-prisma prisma migrate dev --schema ./schema.prisma",
+		"generate": "pnpm --filter pyro-prisma exec prisma generate dev",
+		"migrate": "pnpm --filter pyro-prisma exec prisma migrate dev",
 		"lint": "eslint .",
 		"format": "prettier --write ."
 	},

@@ -4,6 +4,8 @@
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getCategories } from "@/services/categories"; // Pfad ggf. anpassen
+import { createZone } from "@/services/zones";
 import Button from "@mui/material/Button";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
@@ -38,18 +40,8 @@ export function ZoneCreateForm() {
 	useEffect(() => {
 		async function loadCategories() {
 			try {
-				const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004";
-				const res = await fetch(`${baseUrl}/categories`, {
-					// GET
-				});
-				if (!res.ok) {
-					throw new Error(`Fehler beim Laden der Kategorien: ${res.status} ${res.statusText}`);
-				}
-				const data = await res.json();
-				const mapped = data.map((cat: any) => ({
-					id: cat.id,
-					name: cat.name,
-				}));
+				const data = await getCategories();
+				const mapped = data.map((cat: any) => ({ id: cat.id, name: cat.name }));
 				setCategories(mapped);
 			} catch (err) {
 				console.error("loadCategories error:", err);
@@ -94,26 +86,7 @@ export function ZoneCreateForm() {
 
 		// POST zur NestJS-API
 		try {
-			const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004";
-			const response = await fetch(`${baseUrl}/zones`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					categoryId,
-					zoneKey,
-					zoneName,
-					minutesRequired,
-					pointsGranted,
-				}),
-			});
-
-			if (!response.ok) {
-				const errData = await response.json().catch(() => null);
-				const msg = errData?.message || errData?.error || response.statusText;
-				alert(`Fehler beim Erstellen: ${msg}`);
-				return;
-			}
-
+			await createZone({ categoryId, zoneKey, zoneName, minutesRequired, pointsGranted });
 			// Erfolg => zurück zur Liste
 			router.push("/dashboard/categories");
 		} catch (error) {
