@@ -1,3 +1,5 @@
+// apps/api/src/zones/zones.controller.ts
+
 import {
   Controller,
   Get,
@@ -18,55 +20,37 @@ export class ZonesController {
   @Get()
   async findAll() {
     try {
-      const zones = await this.zonesService.findAll();
-      return zones; // Automatisch als JSON
+      return await this.zonesService.findAll();
     } catch (err) {
-      throw new HttpException(
-        'Internal Server Error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Post()
-  async create(
-    @Body()
-    body: {
-      zoneKey: string;
-      zoneName: string;
-      minutesRequired?: number;
-      pointsGranted?: number;
-      categoryId?: string;
-    },
-  ) {
+  async create(@Body() body: {
+    zoneKey: string;
+    zoneName: string;
+    minutesRequired?: number;
+    pointsGranted?: number;
+    categoryId?: string;
+  }) {
     if (!body.zoneKey || !body.zoneName) {
-      throw new HttpException(
-        'zoneKey & zoneName required',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('zoneKey & zoneName required', HttpStatus.BAD_REQUEST);
     }
     try {
-      const newZone = await this.zonesService.createZone({
-        zoneKey: body.zoneKey,
-        zoneName: body.zoneName,
-        minutesRequired: body.minutesRequired,
-        pointsGranted: body.pointsGranted,
+      return await this.zonesService.createZone({
+        ...body,
         categoryId: body.categoryId || null,
       });
-      return newZone;
     } catch (err) {
-      throw new HttpException(
-        'Internal Server Error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Patch(':id')
   async update(
     @Param('id') zoneId: string,
-    @Body()
-    body: {
+    @Body() body: {
       zoneKey?: string;
       zoneName?: string;
       minutesRequired?: number;
@@ -78,13 +62,12 @@ export class ZonesController {
       throw new HttpException('Missing zoneId', HttpStatus.BAD_REQUEST);
     }
     try {
-      const updated = await this.zonesService.updateZone(zoneId, body);
-      return updated;
+      return await this.zonesService.updateZone(zoneId, {
+        ...body,
+        categoryId: body.categoryId || null,
+      });
     } catch (err) {
-      throw new HttpException(
-        'Internal Server Error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -94,32 +77,22 @@ export class ZonesController {
       throw new HttpException('Missing zoneId', HttpStatus.BAD_REQUEST);
     }
     try {
-      const deleted = await this.zonesService.deleteZone(zoneId);
-      return deleted;
+      return await this.zonesService.deleteZone(zoneId);
     } catch (err) {
-      throw new HttpException(
-        'Internal Server Error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Post('bulk-delete')
   async bulkDelete(@Body() body: { zoneIds: string[] }) {
     try {
-      const { zoneIds } = body;
-      if (!zoneIds || zoneIds.length === 0) {
+      if (!body.zoneIds || body.zoneIds.length === 0) {
         throw new HttpException('Keine IDs übergeben', HttpStatus.BAD_REQUEST);
       }
-      // Alle Zone-IDs auf einmal löschen
-      // Prisma kann das so machen:
-      const result = await this.zonesService.deleteManyZones(zoneIds);
+      const result = await this.zonesService.deleteManyZones(body.zoneIds);
       return { deletedCount: result.count };
     } catch (err) {
-      throw new HttpException(
-        'Internal Server Error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

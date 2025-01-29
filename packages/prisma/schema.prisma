@@ -47,6 +47,8 @@ model Zone {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
   userStats  UserZoneStats[]
+  voiceChannels   VoiceChannel[]
+  deletedInDiscord Boolean  @default(false)
 }
 
 
@@ -67,6 +69,16 @@ model DynamicVoiceChannel {
   createdAt      DateTime @default(now())
   allowedUsers   String[] @default([])
   blockedUsers   String[] @default([]) 
+}
+
+model VoiceChannel {
+  id              String   @id @default(cuid())
+  discordChannelId String? @unique
+  zoneId          String?
+  zone            Zone? @relation(fields: [zoneId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+  deletedInDiscord Boolean  @default(false)
 }
 
 model UserTracking {

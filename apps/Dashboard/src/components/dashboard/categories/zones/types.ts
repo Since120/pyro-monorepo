@@ -11,4 +11,6 @@ export interface ZoneResult {
 	categoryName: string | null;
 	lastUsage: Date | null;
 	categoryDeletedInDiscord?: boolean;
+	voiceChannelId?: string | null;              
+  	voiceChannelDeletedInDiscord?: boolean;      
 }

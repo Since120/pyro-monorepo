@@ -1,5 +1,7 @@
 {
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/dashboard/customers/page": "app/dashboard/customers/page.js",
+  "/dashboard/products/page": "app/dashboard/products/page.js",
   "/dashboard/categories/page": "app/dashboard/categories/page.js",
   "/dashboard/categories/edit/[categoryId]/page": "app/dashboard/categories/edit/[categoryId]/page.js",
   "/dashboard/categories/create/page": "app/dashboard/categories/create/page.js"

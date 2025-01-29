@@ -22,6 +22,7 @@ import voiceStateUpdate from "./events/voiceStateUpdate";
 // NEU: unser HTTP-Server, der API-Requests entgegen nimmt
 import { startBotHttpServer } from "./botHttpServer";
 import { registerDiscordEvents } from "./events"; // <--- unser "events/index.ts"
+import axios from "axios";
 
 // 1) Bot-Client erstellen
 export const client = new Client({
@@ -102,6 +103,28 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 client.on("voiceStateUpdate", (oldState: VoiceState, newState: VoiceState) => {
   voiceStateUpdate(oldState, newState);
 });
+
+
+
+ // 5a) channelDelete => Wenn VoiceChannel in Discord manuell gelöscht wird,
+ //     API benachrichtigen => patch voice-channels/discord-deleted
+ client.on("channelDelete", async (channel) => {
+   // Nur reagieren, wenn es ein Voice-Kanal ist (type=2 in Discord.js v14)
+   if (channel.type === 2) { 
+     const discordChannelId = channel.id;
+     const apiUrl = process.env.API_URL || "http://localhost:3000"; // passe ggf. an
+     try {
+       await axios.patch(`${apiUrl}/voice-channels/discord-deleted`, {
+         discordChannelId
+       });
+       logger.info(`channelDelete => Mark VC=${discordChannelId} as deletedInDiscord`);
+     } catch (err) {
+       logger.warn("API call for channelDelete failed:", err);
+     }
+   }
+ });
+
+
 
 // 6) Bot-Login
 const token = process.env.DISCORD_TOKEN;

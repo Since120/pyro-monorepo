@@ -1,4 +1,4 @@
-// KOMPLETTE Datei: apps/api/src/categories/categories.service.ts
+// apps/api/src/categories/categories.service.ts
 
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import axios from 'axios';
@@ -12,8 +12,12 @@ export class CategoriesService {
   // 1) Nur Lesen
   // -------------------------------------
   findAll() {
+    // Standard: Zeigt alle Categories inkl. deletedInDiscord usw.
+    // Falls du sie filtern willst (z. B. nur "deletedInDiscord = false"), 
+    // könntest du hier "where: { deletedInDiscord: false }" ergänzen.
     return this.prisma.category.findMany();
   }
+
   // -------------------------------------
   // 2) CREATE
   // -------------------------------------
@@ -25,7 +29,7 @@ export class CategoriesService {
     trackingActive?: boolean;
     sendSetup?: boolean;
   }) {
-    // 1) DB-Eintrag erstellen
+    // (A) DB => create
     const newCat = await this.prisma.category.create({
       data: {
         name: data.name,
@@ -37,11 +41,10 @@ export class CategoriesService {
       },
     });
 
-    // 2) Bot => in Discord anlegen
+    // (B) Bot => POST /discord/categories
     try {
       const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
       const response = await axios.post(`${botUrl}/discord/categories`, {
-        // Sende an den Bot nur "name"
         name: newCat.name,
       });
       const { discordChannelId } = response.data;
@@ -50,7 +53,7 @@ export class CategoriesService {
         throw new Error('No channelId returned');
       }
 
-      // 3) DB-Eintrag updaten => Speichere discordCategoryId
+      // (C) DB => update discordCategoryId
       await this.prisma.category.update({
         where: { id: newCat.id },
         data: { discordCategoryId: discordChannelId },
@@ -80,13 +83,13 @@ export class CategoriesService {
       sendSetup: boolean;
     }>,
   ) {
-    // 1) DB => updaten
+    // (A) DB => update
     const updated = await this.prisma.category.update({
       where: { id: catId },
       data,
     });
 
-    // 2) Falls Name geändert wird, rename in Discord
+    // (B) Falls Name geändert => rename in Discord
     if (data.name) {
       try {
         if (!updated.discordCategoryId) {
@@ -96,7 +99,7 @@ export class CategoriesService {
         } else {
           const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
           await axios.patch(`${botUrl}/discord/categories`, {
-            id: updated.discordCategoryId, // ID in Discord
+            id: updated.discordCategoryId,
             newName: data.name,
           });
         }
@@ -116,7 +119,7 @@ export class CategoriesService {
   // 4) DELETE
   // -------------------------------------
   async deleteCategory(catId: string) {
-    // 1) DB => Eintrag holen
+    // (A) DB => Eintrag holen
     const cat = await this.prisma.category.findUnique({
       where: { id: catId },
     });
@@ -124,25 +127,22 @@ export class CategoriesService {
       throw new HttpException('Category not found', HttpStatus.NOT_FOUND);
     }
 
-    // NEU (Szenario 1): Prüfen, ob Zonen existieren
+    // (B) Prüfen, ob noch Zonen existieren
     const zoneCount = await this.prisma.zone.count({
       where: { categoryId: catId },
     });
     if (zoneCount > 0) {
-      // => Fehlermeldung, die wir im Frontend abfangen können
       throw new HttpException(
         'Kategorie kann nicht gelöscht werden, solange noch Zonen damit verknüpft sind!',
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    // 2) Bot => DELETE (nur wenn discordCategoryId existiert)
+    // (C) Bot => DELETE /discord/categories/:discordCategoryId
     if (cat.discordCategoryId) {
       try {
         const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
-        await axios.delete(
-          `${botUrl}/discord/categories/${cat.discordCategoryId}`,
-        );
+        await axios.delete(`${botUrl}/discord/categories/${cat.discordCategoryId}`);
       } catch (err) {
         console.error('Error while deleting Discord category:', err);
         throw new HttpException(
@@ -152,28 +152,27 @@ export class CategoriesService {
       }
     } else {
       console.warn(
-        `deleteCategory: Category ${catId} hat KEINE discordCategoryId => Nix zu löschen in Discord`,
+        `deleteCategory: Category ${catId} hat KEINE discordCategoryId => kein Discord-Delete`,
       );
     }
 
-    // 3) DB => Eintrag entfernen
-    return this.prisma.category.delete({
-      where: { id: catId },
-    });
+     // (D) Soft Delete => Set "deletedInDiscord = true"
+     // So bleibt der Eintrag in der DB erhalten.
+     return this.prisma.category.update({
+       where: { id: catId },
+       data: { deletedInDiscord: true },
+     });
   }
 
   // -------------------------------------
   // 5) MARK AS DELETED (Bot hat Category gelöscht)
   // -------------------------------------
   async markAsDeletedInDiscord(discordCategoryId: string) {
-    console.log(
-      'markAsDeletedInDiscord => discordCategoryId=',
-      discordCategoryId,
-    );
+    console.log('markAsDeletedInDiscord => discordCategoryId=', discordCategoryId);
 
-    // 1) Datensatz finden
+    // (A) Datensatz finden
     const cat = await this.prisma.category.findFirst({
-      where: { discordCategoryId: discordCategoryId },
+      where: { discordCategoryId },
     });
     console.log('Gefundene Category:', cat);
 
@@ -181,7 +180,7 @@ export class CategoriesService {
       throw new Error(`Category not found for channelId=${discordCategoryId}`);
     }
 
-    // 2) DB updaten => "deletedInDiscord = true"
+    // (B) DB => "deletedInDiscord = true"
     try {
       const updated = await this.prisma.category.update({
         where: { id: cat.id },
@@ -199,7 +198,7 @@ export class CategoriesService {
   // 6) RESTORE (NEU)
   // -------------------------------------
   async restoreCategoryInDiscord(catId: string) {
-    // 1) DB => find
+    // (A) DB => load
     const cat = await this.prisma.category.findUnique({
       where: { id: catId },
     });
@@ -207,7 +206,7 @@ export class CategoriesService {
       throw new HttpException('Category not found', HttpStatus.NOT_FOUND);
     }
 
-    // 2) Prüfen, ob "deletedInDiscord" = true
+    // (B) Prüfen => deletedInDiscord?
     if (!cat.deletedInDiscord) {
       throw new HttpException(
         'Kategorie ist gar nicht als gelöscht markiert.',
@@ -215,7 +214,7 @@ export class CategoriesService {
       );
     }
 
-    // 3) Bot => neu anlegen
+    // (C) Bot => neu anlegen
     try {
       const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
       const response = await axios.post(`${botUrl}/discord/categories`, {
@@ -226,7 +225,7 @@ export class CategoriesService {
         throw new Error('No channelId returned from Bot');
       }
 
-      // 4) DB => update
+      // (D) DB => update
       const updated = await this.prisma.category.update({
         where: { id: cat.id },
         data: {
