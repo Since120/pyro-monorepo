@@ -2,15 +2,11 @@
   "node": {
     "005635225a958785ef49ede97d014708c6904dcab5": {
       "workers": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+          "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
+          "async": false
+        },
         "app/dashboard/categories/page": {
-          "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
-          "async": false
-        },
-        "app/dashboard/categories/create/page": {
-          "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
-          "async": false
-        },
-        "app/dashboard/categories/zones/create/page": {
           "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
           "async": false
         },
@@ -18,30 +14,25 @@
           "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
           "async": false
         },
-        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+        "app/dashboard/categories/create/page": {
           "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
           "async": false
         }
       },
       "layer": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": "rsc",
         "app/dashboard/categories/page": "rsc",
-        "app/dashboard/categories/create/page": "rsc",
-        "app/dashboard/categories/zones/create/page": "rsc",
         "app/dashboard/categories/edit/[categoryId]/page": "rsc",
-        "app/dashboard/categories/zones/edit/[zoneId]/page": "rsc"
+        "app/dashboard/categories/create/page": "rsc"
       }
     },
     "406a7941870bb9442d7430f464d4c6ed57b640e582": {
       "workers": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+          "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
+          "async": false
+        },
         "app/dashboard/categories/page": {
-          "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
-          "async": false
-        },
-        "app/dashboard/categories/create/page": {
-          "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
-          "async": false
-        },
-        "app/dashboard/categories/zones/create/page": {
           "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
           "async": false
         },
@@ -49,30 +40,25 @@
           "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
           "async": false
         },
-        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+        "app/dashboard/categories/create/page": {
           "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Capps%5C%5CDashboard%5C%5Csrc%5C%5Clib%5C%5Csettings.ts%22%2C%5B%5B%22005635225a958785ef49ede97d014708c6904dcab5%22%2C%22getSettings%22%5D%2C%5B%22406a7941870bb9442d7430f464d4c6ed57b640e582%22%2C%22setSettings%22%5D%5D%5D%5D&__client_imported__=!",
           "async": false
         }
       },
       "layer": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": "rsc",
         "app/dashboard/categories/page": "rsc",
-        "app/dashboard/categories/create/page": "rsc",
-        "app/dashboard/categories/zones/create/page": "rsc",
         "app/dashboard/categories/edit/[categoryId]/page": "rsc",
-        "app/dashboard/categories/zones/edit/[zoneId]/page": "rsc"
+        "app/dashboard/categories/create/page": "rsc"
       }
     },
     "7f4bb884edf27f3e95ad23f0ba07ccfec4320a2790": {
       "workers": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+          "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
+          "async": false
+        },
         "app/dashboard/categories/page": {
-          "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        },
-        "app/dashboard/categories/create/page": {
-          "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        },
-        "app/dashboard/categories/zones/create/page": {
           "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         },
@@ -80,30 +66,25 @@
           "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         },
-        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+        "app/dashboard/categories/create/page": {
           "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         }
       },
       "layer": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": "action-browser",
         "app/dashboard/categories/page": "action-browser",
-        "app/dashboard/categories/create/page": "action-browser",
-        "app/dashboard/categories/zones/create/page": "action-browser",
         "app/dashboard/categories/edit/[categoryId]/page": "action-browser",
-        "app/dashboard/categories/zones/edit/[zoneId]/page": "action-browser"
+        "app/dashboard/categories/create/page": "action-browser"
       }
     },
     "7f4bbb4894dc17905ff13fb361080fcbece7bea9d9": {
       "workers": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+          "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
+          "async": false
+        },
         "app/dashboard/categories/page": {
-          "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        },
-        "app/dashboard/categories/create/page": {
-          "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        },
-        "app/dashboard/categories/zones/create/page": {
           "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         },
@@ -111,30 +92,25 @@
           "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         },
-        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+        "app/dashboard/categories/create/page": {
           "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         }
       },
       "layer": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": "action-browser",
         "app/dashboard/categories/page": "action-browser",
-        "app/dashboard/categories/create/page": "action-browser",
-        "app/dashboard/categories/zones/create/page": "action-browser",
         "app/dashboard/categories/edit/[categoryId]/page": "action-browser",
-        "app/dashboard/categories/zones/edit/[zoneId]/page": "action-browser"
+        "app/dashboard/categories/create/page": "action-browser"
       }
     },
     "7f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b": {
       "workers": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+          "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
+          "async": false
+        },
         "app/dashboard/categories/page": {
-          "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        },
-        "app/dashboard/categories/create/page": {
-          "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        },
-        "app/dashboard/categories/zones/create/page": {
           "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         },
@@ -142,17 +118,16 @@
           "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         },
-        "app/dashboard/categories/zones/edit/[zoneId]/page": {
+        "app/dashboard/categories/create/page": {
           "moduleId": "(action-browser)/../../node_modules/.pnpm/next@15.1.4_@babel+core@7.26.7_babel-plugin-macros@3.1.0_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Ckeyless-actions.js%22%2C%5B%5B%227f4bb884edf27f3e95ad23f0ba07ccfec4320a2790%22%2C%22createOrReadKeylessAction%22%5D%2C%5B%227f4bbb4894dc17905ff13fb361080fcbece7bea9d9%22%2C%22syncKeylessConfigAction%22%5D%5D%5D%2C%5B%22C%3A%5C%5CUsers%5C%5Cinfo%5C%5CDocuments%5C%5CDiscord%20Bot%5C%5Cpyro-monorepo%5C%5Cnode_modules%5C%5C.pnpm%5C%5C%40clerk%2Bnextjs%406.9.9_next%4015.1.4_%40babel%2Bcore%407.26.7_babel-plugin-macros%403.1.0_react-dom%4019.0.0_gwamn7vew23mcqni6ot7b7babu%5C%5Cnode_modules%5C%5C%40clerk%5C%5Cnextjs%5C%5Cdist%5C%5Cesm%5C%5Capp-router%5C%5Cserver-actions.js%22%2C%5B%5B%227f369eb3cf4969c34e22f79dcd2d354d7c49ddc12b%22%2C%22invalidateCacheAction%22%5D%5D%5D%5D&__client_imported__=true!",
           "async": false
         }
       },
       "layer": {
+        "app/dashboard/categories/zones/edit/[zoneId]/page": "action-browser",
         "app/dashboard/categories/page": "action-browser",
-        "app/dashboard/categories/create/page": "action-browser",
-        "app/dashboard/categories/zones/create/page": "action-browser",
         "app/dashboard/categories/edit/[categoryId]/page": "action-browser",
-        "app/dashboard/categories/zones/edit/[zoneId]/page": "action-browser"
+        "app/dashboard/categories/create/page": "action-browser"
       }
     }
   },

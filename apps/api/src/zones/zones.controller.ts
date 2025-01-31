@@ -1,5 +1,4 @@
-// apps/api/src/zones/zones.controller.ts
-
+// Pfad: apps/api/src/zones/zones.controller.ts
 import {
   Controller,
   Get,
@@ -87,7 +86,7 @@ export class ZonesController {
   async bulkDelete(@Body() body: { zoneIds: string[] }) {
     try {
       if (!body.zoneIds || body.zoneIds.length === 0) {
-        throw new HttpException('Keine IDs übergeben', HttpStatus.BAD_REQUEST);
+        throw new HttpException('No IDs given', HttpStatus.BAD_REQUEST);
       }
       const result = await this.zonesService.deleteManyZones(body.zoneIds);
       return { deletedCount: result.count };

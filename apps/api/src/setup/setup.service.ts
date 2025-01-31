@@ -95,7 +95,7 @@ export class SetupService {
             type: 'button',
             label: 'Setup',
             style: 'primary',
-            customId: 'setup:start', // => Dein customId
+            customId: `wizard:start:${cat.id}`, // => wizard:start:CATID
           },
         ],
       });

@@ -1,8 +1,8 @@
 // apps/Bot/src/index.ts
 
 import "dotenv/config";
-import * as dotenv from 'dotenv';
-import * as dotenvExpand from 'dotenv-expand';
+import * as dotenv from "dotenv";
+import * as dotenvExpand from "dotenv-expand";
 import {
   Client,
   IntentsBitField,
@@ -11,67 +11,82 @@ import {
   VoiceState,
   StringSelectMenuInteraction,
   UserSelectMenuInteraction,
+  Channel,
+  ChannelType,
 } from "discord.js";
 import fs from "fs";
 import path from "path";
-
-import logger from "./services/logger";
-import { ExtendedClient, BotCommand } from "./extendedClient";
-import voiceStateUpdate from "./events/voiceStateUpdate";
-import voiceStateUpdateNew from "./events/voiceStateUpdateNew";
-
-
-// NEU: unser HTTP-Server, der API-Requests entgegen nimmt
-import { startBotHttpServer } from "./botHttpServer";
-import { registerDiscordEvents } from "./events"; // <--- unser "events/index.ts"
 import axios from "axios";
 
-export const ChannelsDeletedByApi = new Set<string>()
-// 1) Bot-Client erstellen
-export const client = new Client({
+import logger from "./services/logger";
+import voiceStateUpdate from "./events/voiceStateUpdate";
+import { startBotHttpServer } from "./botHttpServer";
+
+
+// Merkt sich Voice-Kanäle, die wir selber per API löschen
+export const ChannelsDeletedByApi = new Set<string>();
+
+// 1) dotenv laden
+const myEnv = dotenv.config();
+dotenvExpand.expand(myEnv);
+
+// 2) Discord-Client erstellen
+const client = new Client({
   intents: [
     IntentsBitField.Flags.Guilds,
     IntentsBitField.Flags.GuildMembers,
     IntentsBitField.Flags.GuildVoiceStates,
-    // etc. je nach Bedarf ...
   ],
-}) as ExtendedClient;
+});
 
-const myEnv = dotenv.config(); // Lädt deine .env
-dotenvExpand.expand(myEnv);    // Erweitert Variablen wie ${POSTGRES_HOST} usw.
 
-// 2) Slash Commands laden
-client.commands = new Collection<string, BotCommand>();
+client.on("interactionCreate", async (interaction) => {
+  // ...
+  if (interaction.isButton()) {
+    // (A) Wizard
+    if (interaction.customId.startsWith("wizard:")) {
+      const { handleWizardInteraction } = require("./interaction_handlers/wizardInteractions");
+      return handleWizardInteraction(interaction);
+    }
+    // (B) Falls du noch andere Buttons hast, z.B. "voice_setting_..."
+    //     hier abfragen ...
+  }
+});
 
+
+// 3) Optional: Slash Command Collection
+(client as any).commands = new Collection<string, any>();
+
+// 3b) Falls du Slash-Commands laden willst (Ordner existiert?):
 const commandsPath = path.join(__dirname, "commands", "slashCommands");
-const commandFiles = fs
-  .readdirSync(commandsPath)
-  .filter((file) => file.endsWith(".ts") || file.endsWith(".js"));
+if (fs.existsSync(commandsPath)) {
+  const commandFiles = fs
+    .readdirSync(commandsPath)
+    .filter((file) => file.endsWith(".ts") || file.endsWith(".js"));
 
-for (const file of commandFiles) {
-  const filePath = path.join(commandsPath, file);
-  const commandModule = require(filePath);
-  if (commandModule.data && commandModule.execute) {
-    const cmdName = commandModule.data.name;
-    client.commands.set(cmdName, {
-      data: commandModule.data,
-      execute: commandModule.execute,
-    });
-    logger.info(`Slash Command geladen: ${cmdName}`);
+  for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const commandModule = require(filePath);
+    if (commandModule.data && commandModule.execute) {
+      const cmdName = commandModule.data.name;
+      (client as any).commands.set(cmdName, {
+        data: commandModule.data,
+        execute: commandModule.execute,
+      });
+      logger.info(`Slash Command geladen: ${cmdName}`);
+    }
   }
 }
 
-// 3) HTTP-Server starten (NEU)
+// 4) HTTP-Server starten
 startBotHttpServer();
 
-registerDiscordEvents(client);
-
-// 4) Discord-Event: interactionCreate
+// 5) Interactions (slash/modal/selectMenu) — Button-Handling separat in wizardInteractions
 client.on("interactionCreate", async (interaction: Interaction) => {
-  // 4a) Slash Command
+  // 5a) Slash Commands
   if (interaction.isChatInputCommand()) {
     const { commandName } = interaction;
-    const cmd = client.commands.get(commandName);
+    const cmd = (client as any).commands.get(commandName);
     if (!cmd) {
       return interaction.reply({ content: "Unbekannter Slash-Befehl!", ephemeral: true });
     }
@@ -84,17 +99,13 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       }
     }
   }
-  // 4b) Button
-  else if (interaction.isButton()) {
-    const { handleButton } = require("./interaction_handlers/buttonInteractions");
-    return handleButton(interaction);
-  }
-  // 4c) ModalSubmit
+  // 5b) Button => (VERALTETER Code entfernt)
+  // 5c) ModalSubmit
   else if (interaction.isModalSubmit()) {
     const { handleModal } = require("./interaction_handlers/modalInteractions");
     return handleModal(interaction);
   }
-  // 4d) SelectMenu
+  // 5d) SelectMenu
   else if (interaction.isAnySelectMenu()) {
     const typedSelectMenu = interaction as StringSelectMenuInteraction | UserSelectMenuInteraction;
     const { handleSelectMenu } = require("./interaction_handlers/selectMenuInteractions");
@@ -102,43 +113,33 @@ client.on("interactionCreate", async (interaction: Interaction) => {
   }
 });
 
-// 5) VoiceStateUpdate
+// 6) VoiceStateUpdate
 client.on("voiceStateUpdate", (oldState: VoiceState, newState: VoiceState) => {
   voiceStateUpdate(oldState, newState);
 });
 
-client.on("voiceStateUpdate", (oldState: VoiceState, newState: VoiceState) => {
-  voiceStateUpdateNew(oldState, newState);
+// 7) channelDelete => Falls VoiceChannel in Discord manuell gelöscht wird
+client.on("channelDelete", async (channel: Channel) => {
+  if (channel.type === ChannelType.GuildVoice) {
+    if (ChannelsDeletedByApi.has(channel.id)) {
+      ChannelsDeletedByApi.delete(channel.id);
+      logger.info(`(channelDelete) => Kanal ${channel.id} via API gelöscht, ignoriere.`);
+      return;
+    }
+    const discordChannelId = channel.id;
+    const apiUrl = process.env.API_URL || "http://localhost:3000";
+    try {
+      await axios.patch(`${apiUrl}/voice-channels/discord-deleted`, {
+        discordChannelId,
+      });
+      logger.info(`channelDelete => Mark VC=${discordChannelId} as deletedInDiscord`);
+    } catch (err) {
+      logger.warn("API call for channelDelete failed:", err);
+    }
+  }
 });
 
-
- // 5a) channelDelete => Wenn VoiceChannel in Discord manuell gelöscht wird,
- //     API benachrichtigen => patch voice-channels/discord-deleted
- client.on("channelDelete", async (channel) => {
-   // Nur reagieren, wenn es ein Voice-Kanal ist (type=2 in Discord.js v14)
-   if (channel.type === 2) { 
-       // NEU: Prüfen, ob wir selbst diesen Kanal gelöscht haben
-   if (ChannelsDeletedByApi.has(channel.id)) {
-     ChannelsDeletedByApi.delete(channel.id); // wieder entfernen
-     logger.info(`(channelDelete) => Kanal ${channel.id} wurde bewusst via API gelöscht. Ignoriere!`);
-     return;
-   }
-     const discordChannelId = channel.id;
-     const apiUrl = process.env.API_URL || "http://localhost:3000"; // passe ggf. an
-     try {
-       await axios.patch(`${apiUrl}/voice-channels/discord-deleted`, {
-         discordChannelId
-       });
-       logger.info(`channelDelete => Mark VC=${discordChannelId} as deletedInDiscord`);
-     } catch (err) {
-       logger.warn("API call for channelDelete failed:", err);
-     }
-   }
- });
-
-
-
-// 6) Bot-Login
+// 8) Bot-Login
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
   logger.error("Fehler: Keine DISCORD_TOKEN in .env");
@@ -147,3 +148,5 @@ if (!token) {
 client.login(token).then(() => {
   logger.info("Bot online!");
 });
+
+export { client };

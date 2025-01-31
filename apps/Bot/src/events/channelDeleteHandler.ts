@@ -1,4 +1,4 @@
-// KOMPLETTE Datei: apps/Bot/src/events/channelDeleteHandler.ts
+// apps/Bot/src/events/channelDeleteHandler.ts
 
 import { Channel, ChannelType } from "discord.js";
 import logger from "../services/logger";

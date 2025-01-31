@@ -1,122 +1,76 @@
-// src/bot/events/voiceStateUpdate.ts
-
+// apps/Bot/src/events/voiceStateUpdate.ts
 import { VoiceState } from "discord.js";
-import { getDynamicChannelById, deleteDynamicChannel } from "../services/dynamicChannelService";
+import axios from "axios";
 import logger from "../services/logger";
-import { getRoleConfigByKey } from "../services/roleConfigService";
-import { prisma } from "../services/dbClient"; // Wir löschen userTracking-Eintrag
-
-// NEU:
-import { trackTimeOnChannelLeave, handleNewChannelJoin } from "../services/zoneTrackingHelper";
-
-export default async function voiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
-  const member = oldState.member || newState.member;
-  if (!member) return;
-
-  // 1) Kanal-Wechsel -> check ob alter Kanal leer => löschen
-  if (oldState.channelId && oldState.channelId !== newState.channelId) {
-    const oldChannel = oldState.channel;
-
-    // NEU: erst Zeit abrechnen
-    await trackTimeOnChannelLeave(member, oldState.channelId);
-
-    if (oldChannel && oldChannel.members.size === 0) {
-      const dyn = await getDynamicChannelById(oldChannel.id);
-      if (dyn) {
-        await oldChannel.delete("Dynamischer Kanal leer");
-        await deleteDynamicChannel(oldChannel.id);
-        logger.info(`Dynamischer VoiceKanal gelöscht: ${oldChannel.name}`);
-      }
-    }
-  }
-
-  // 2) Full Leave => check ob user in KEINEM dynamischen Channel mehr ist => remove Rolle
-  if (oldState.channelId && !newState.channelId) {
-    // user hat voice komplett verlassen
-    await checkAndRemoveFreigabeIfNoChannel(member);
-  } else if (
-    oldState.channelId &&
-    newState.channelId &&
-    oldState.channelId !== newState.channelId
-  ) {
-    // user wechselt -> check ob user noch in dynamic channel?
-    await checkAndRemoveFreigabeIfNoChannel(member);
-  }
-
-  // NEU: user joint neuen Channel => handleNewChannelJoin
-  if (newState.channelId && oldState.channelId !== newState.channelId) {
-    await handleNewChannelJoin(member, newState.channelId);
-  }
-}
 
 /**
- * Hilfsfunktion: Prüfen, ob user in mind. 1 dynamic channel
- * Falls nein => removeFreigabeRoleAndCleanOverwrites
+ * NEUES voiceStateUpdate, das die 
+ * /tracking/join + /tracking/leave Endpunkte anpingt.
  */
-async function checkAndRemoveFreigabeIfNoChannel(member: any) {
-  // Falls user in KEINEM Voice => remove
-  if (!member.voice.channelId) {
-    await removeFreigabeRoleAndCleanOverwrites(member);
-    return;
-  }
+export default async function voiceStateUpdateNew(oldState: VoiceState, newState: VoiceState) {
+  // 1) Prüfen, ob User einen VoiceChannel betritt
+  const apiUrl = process.env.API_URL || "http://localhost:3004"; // oder 3000, je nachdem
+  const userId = newState.member?.id;  // oder oldState.member?.id
+  if (!userId) return;
 
-  // user ist in channel => check ob channel dynamisch
-  const channel = member.voice.channel;
-  const dyn = await getDynamicChannelById(channel.id);
+  // 2) zoneId herausfinden
+  //    => wie? Du hast in DB voiceChannel.discordChannelId => zoneId => zone
+  //    => hier z.B. per axios GET /voice-channels?discordId=...
+  //    => oder via /zones?filter=...
+  //    => zur Demo: wir tun so, als könnten wir es resolven:
 
-  if (!dyn) {
-    // => user ist NICHT in dynamic channel => remove
-    await removeFreigabeRoleAndCleanOverwrites(member);
-  } else {
-    // => user ist in dynamic channel => Rolle behalten
-  }
-}
-
-async function removeFreigabeRoleAndCleanOverwrites(member: any) {
-  const rc = await getRoleConfigByKey("freigabe");
-  if (!rc) return;
-
-  if (!member.roles.cache.has(rc.roleId)) {
-    // User hat die Rolle gar nicht => nichts zu tun
-    return;
-  }
-
-  // Rolle entfernen
-  await member.roles.remove(rc.roleId).catch(() => null);
-  logger.info(`Freigabe-Rolle von ${member.user.tag} entfernt (left all dynamic channels).`);
-
-  // userTracking-Eintrag löschen
-  try {
-    await prisma.userTracking.delete({
-      where: { userId: member.user.id },
-    });
-    logger.info(`UserTracking-Eintrag für ${member.user.tag} wurde gelöscht.`);
-  } catch (err) {
-    logger.warn(`Konnte den userTracking-Eintrag nicht entfernen: ${err}`);
-  }
-
-  // Overwrites in allen dynamischen Kanälen entfernen
-  const settings = await prisma.adminSettings.findFirst();
-  if (!settings || !settings.voiceCategoryId) {
-    logger.warn("Keine voiceCategoryId definiert, kann Overwrites nicht entfernen.");
-    return;
-  }
-
-  const guild = member.guild;
-  const allDynChannels = await prisma.dynamicVoiceChannel.findMany();
-
-  for (const ch of allDynChannels) {
-    const channelObj = guild.channels.cache.get(ch.channelId);
-    if (!channelObj) continue;
-    if (channelObj.parentId !== settings.voiceCategoryId) {
-      continue;
-    }
-
+  const findZoneIdForChannel = async (discordChannelId: string) => {
+    // Minimal-Demo: GET /voice-channels/lookup?discordChannelId=...
     try {
-      await channelObj.permissionOverwrites.delete(member.user.id);
-      logger.info(`Overwrites gelöscht in Kanal ${channelObj.name} für ${member.user.tag}`);
+      const resp = await axios.get(`${apiUrl}/voice-channels/lookup`, {
+        params: { discordChannelId },
+      });
+      // => { zoneId: '...' }
+      return resp.data.zoneId as string | null;
     } catch (err) {
-      logger.warn(`Fehler beim Overwrite-Entfernen in ${channelObj.name}: ${err}`);
+      logger.warn("channel -> zone lookup fail", err);
+      return null;
+    }
+  };
+
+  // 3) Jemand joined => newState.channelId != null, oldState.channelId == null
+  if (!oldState.channelId && newState.channelId) {
+    // user joins
+    const zoneId = await findZoneIdForChannel(newState.channelId);
+    if (!zoneId) {
+      // Kein Mapping => skip
+      return;
+    }
+    // userRoles => array of string IDs
+    const roles = newState.member?.roles.cache.map(r => r.id) || [];
+
+    // 4) ruf /tracking/join
+    try {
+      await axios.post(`${apiUrl}/tracking/join`, {
+        userId,
+        zoneId,
+        userRoles: roles,
+      });
+      logger.info(`[voiceStateUpdateNew] userJoined => zone=${zoneId}, userId=${userId}`);
+    } catch (err) {
+      logger.error("tracking/join failed:", err);
+    }
+  }
+  // 5) Jemand verlässt => oldState.channelId != null, newState.channelId == null
+  else if (oldState.channelId && !newState.channelId) {
+    // user leaves
+    const zoneId = await findZoneIdForChannel(oldState.channelId);
+    if (!zoneId) {
+      return;
+    }
+    try {
+      await axios.post(`${apiUrl}/tracking/leave`, {
+        userId,
+        zoneId,
+      });
+      logger.info(`[voiceStateUpdateNew] userLeft => zone=${zoneId}, userId=${userId}`);
+    } catch (err) {
+      logger.error("tracking/leave failed:", err);
     }
   }
 }

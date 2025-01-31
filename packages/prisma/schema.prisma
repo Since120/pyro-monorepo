@@ -115,14 +115,9 @@ model AdminSettings {
 model UserZoneStats {
   id                 String   @id @default(cuid())
   userId             String
-
-  // ALT: Bot-Code nutzt zoneKey
   zoneKey            String
-
-  // NEU: Optionale Relation, damit wir schrittweise migrieren können
   zoneId             String?
   zone               Zone? @relation(fields: [zoneId], references: [id])
-
   totalSecondsInZone Int      @default(0)
   leftoverSeconds    Int      @default(0)
   pointsInThisZone   Int      @default(0)
@@ -138,8 +133,23 @@ model UserZoneStats {
 model UserGlobalStats {
   id                  String   @id @default(cuid())
   userId              String   @unique
+  isTracked           Boolean  @default(false)
   totalPoints         Int      @default(0)
   totalTimeInAllZones Int      @default(0)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @default(now()) @updatedAt
+}
+
+
+model WizardSession {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  categoryId  String?   // optional, falls wir die Category tracken
+  stepIndex   Int      @default(0)
+  trackingActive Boolean?
+  channelName String?   // Der Name, den der User eingibt
+  chosenZoneId String?  // Die Zone, die ausgewählt wurde
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 }
