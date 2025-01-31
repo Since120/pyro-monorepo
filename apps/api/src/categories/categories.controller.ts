@@ -17,7 +17,7 @@ import { CategoriesService } from './categories.service';
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
-  // 1) GET /categories
+  // 1) GET /categories + categories Name
   @Get()
   async findAll() {
     try {
@@ -27,6 +27,16 @@ export class CategoriesController {
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+
+  @Get(':id')
+async findOne(@Param('id') catId: string) {
+  if (!catId) throw new HttpException('catId missing', HttpStatus.BAD_REQUEST);
+  const category = await this.categoriesService.findOne(catId);
+  if (!category) {
+    throw new HttpException('Category not found', HttpStatus.NOT_FOUND);
+  }
+  return category;
+}
 
   // 2) POST /categories
   @Post()

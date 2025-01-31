@@ -88,4 +88,13 @@ export class CategoriesService {
   restoreCategoryInDiscord(catId: string) {
     return this.categoryRestore.restoreCategoryInDiscord(catId);
   }
+
+   /**
+   * 7) Find Category Name
+   */
+  findOne(catId: string) {
+    return this.prisma.category.findUnique({
+      where: { id: catId },
+    });
+  }
 }

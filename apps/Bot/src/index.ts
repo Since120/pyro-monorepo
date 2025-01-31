@@ -40,6 +40,35 @@ const client = new Client({
 });
 
 
+client.on("channelDelete", async (channel) => {
+  // Prüfen ob Kanal vom Bot/der API selbst gelöscht wurde:
+  if (ChannelsDeletedByApi.has(channel.id)) {
+    ChannelsDeletedByApi.delete(channel.id);
+    logger.info(`(channelDelete) => Kategorie ${channel.id} via API gelöscht, ignoriere...`);
+    return;
+  }
+
+  // Falls es eine Kategorie ist => Patch an /categories/discord-deleted
+  if (channel.type === ChannelType.GuildCategory) {
+    try {
+      const apiUrl = process.env.API_URL || "http://localhost:3004";
+      await axios.patch(`${apiUrl}/categories/discord-deleted`, {
+        discordCategoryId: channel.id,
+      });
+      logger.info(`channelDelete => Markiere Category=${channel.id} als deletedInDiscord`);
+    } catch (err) {
+      logger.warn("API call for categoryDelete failed:", err);
+    }
+  }
+
+  // Sonst, wenn es ein Voice-Channel ist => die bestehende Logik
+  if (channel.type === ChannelType.GuildVoice) {
+    // ... Dein existierender Code
+  }
+  // Falls du TextChannels, etc. unterscheiden willst: ...
+});
+
+
 client.on("interactionCreate", async (interaction) => {
   // ...
   if (interaction.isButton()) {

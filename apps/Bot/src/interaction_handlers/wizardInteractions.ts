@@ -16,6 +16,19 @@ export async function handleWizardInteraction(interaction: Interaction) {
     const parts = customId.split(':'); // z.B. ['wizard','start','CAT_123']
     const categoryId = parts[2] || 'NO_CATEGORY_ID';
 
+
+    let catName = categoryId;
+    try {
+      const resp = await axios.get(`${apiUrl}/categories/${categoryId}`);
+      if (resp.data && resp.data.name) {
+        catName = resp.data.name;
+      }
+    } catch (err) {
+      logger.warn("Kategorie konnte nicht geladen werden:", err);
+      // Falls Fehler, bleibt catName als fallback=categoryId
+    }
+
+
     // 1) /wizard/start
     try {
       await axios.post(`${apiUrl}/wizard/start`, {
@@ -24,7 +37,7 @@ export async function handleWizardInteraction(interaction: Interaction) {
       });
 
       await interaction.reply({
-        content: `Willst du Tracking aktivieren?\n(Deine Kategorie: ${categoryId})`,
+        content: `Willst du Tracking aktivieren?\n(Du bist in der Kategorie: ${catName})`,
         ephemeral: true,
         components: [
           {
