@@ -1,6 +1,6 @@
 // apps/api/src/zones/voice-channel/voice-channel.controller.ts
 
-import { Body, Controller, HttpException, HttpStatus, Patch, Param  } from '@nestjs/common';
+import { Body, Controller, HttpException, HttpStatus, Patch, Param,Get, Query, BadRequestException } from '@nestjs/common';
 import { VoiceChannelService } from './voice-channel.service';
 
 
@@ -39,4 +39,22 @@ export class VoiceChannelController {
       throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+    /**
+     * GET /voice-channels/lookup?discordChannelId=123
+     * => Liefert { zoneId: string | null }, damit der Bot weiß, wohin tracken.
+     */
+    @Get('lookup')
+    async lookupZoneId(@Query('discordChannelId') discordId: string) {
+      if (!discordId) {
+        throw new BadRequestException('missing discordChannelId');
+      }
+  
+      // => voiceChannelService => findByDiscordId
+      const vc = await this.voiceChannelService.findByDiscordId(discordId);
+      if (!vc) {
+        // existiert nicht
+        return { zoneId: null };
+      }
+      return { zoneId: vc.zoneId };
+    }
 }

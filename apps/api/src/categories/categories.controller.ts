@@ -179,4 +179,26 @@ export class CategoriesController {
       );
     }
   }
+
+    // -----------------------------------
+  // 6) DELETE /categories/:id/hard
+  //    => HARD-Delete (wirklich aus DB entfernen)
+  // -----------------------------------
+  @Delete(':id/hard')
+  async removeHard(@Param('id') catId: string) {
+    if (!catId) {
+      throw new HttpException('Missing categoryId', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      const deleted = await this.categoriesService.deleteCategoryHard(catId);
+      return deleted;
+    } catch (err) {
+      console.error('Fehler in removeHard():', err);
+      // Bei Fehler => 500
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

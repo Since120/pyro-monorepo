@@ -36,3 +36,10 @@ export function createCategory(payload: any) {
 export function getCategories() {
 	return request("categories"); // GET /categories
 }
+
+
+export async function deleteCategoryHard(id: string) {
+	  return request(`categories/${id}/hard`, {
+	    method: "DELETE",
+	  });
+	}

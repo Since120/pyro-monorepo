@@ -66,7 +66,11 @@ export class VoiceChannelService {
       return newVC;
     }
   }
-
+    async findByDiscordId(discordChannelId: string) {
+        return this.prisma.voiceChannel.findUnique({
+          where: { discordChannelId },
+        });
+      }
   /**
    * Löscht alle VoiceChannels für eine Zone:
    * 1) In Discord löschen

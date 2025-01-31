@@ -47,7 +47,7 @@ export function RoleSelectSection({ selectedRoleIds, onChange }: RoleSelectSecti
 				onChange(newIds);
 			}}
 			renderInput={(params) => (
-				<TextField {...params} variant="outlined" label="Wer hat Zugang (Rollen)" placeholder="Wähle aus..." />
+				<TextField {...params} variant="outlined" label="Welche Rollen werden getrackt?" placeholder="Wähle aus..." />
 			)}
 		/>
 	);

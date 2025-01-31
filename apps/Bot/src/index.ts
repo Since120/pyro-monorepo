@@ -18,12 +18,15 @@ import path from "path";
 import logger from "./services/logger";
 import { ExtendedClient, BotCommand } from "./extendedClient";
 import voiceStateUpdate from "./events/voiceStateUpdate";
+import voiceStateUpdateNew from "./events/voiceStateUpdateNew";
+
 
 // NEU: unser HTTP-Server, der API-Requests entgegen nimmt
 import { startBotHttpServer } from "./botHttpServer";
 import { registerDiscordEvents } from "./events"; // <--- unser "events/index.ts"
 import axios from "axios";
 
+export const ChannelsDeletedByApi = new Set<string>()
 // 1) Bot-Client erstellen
 export const client = new Client({
   intents: [
@@ -104,6 +107,9 @@ client.on("voiceStateUpdate", (oldState: VoiceState, newState: VoiceState) => {
   voiceStateUpdate(oldState, newState);
 });
 
+client.on("voiceStateUpdate", (oldState: VoiceState, newState: VoiceState) => {
+  voiceStateUpdateNew(oldState, newState);
+});
 
 
  // 5a) channelDelete => Wenn VoiceChannel in Discord manuell gelöscht wird,
@@ -111,6 +117,12 @@ client.on("voiceStateUpdate", (oldState: VoiceState, newState: VoiceState) => {
  client.on("channelDelete", async (channel) => {
    // Nur reagieren, wenn es ein Voice-Kanal ist (type=2 in Discord.js v14)
    if (channel.type === 2) { 
+       // NEU: Prüfen, ob wir selbst diesen Kanal gelöscht haben
+   if (ChannelsDeletedByApi.has(channel.id)) {
+     ChannelsDeletedByApi.delete(channel.id); // wieder entfernen
+     logger.info(`(channelDelete) => Kanal ${channel.id} wurde bewusst via API gelöscht. Ignoriere!`);
+     return;
+   }
      const discordChannelId = channel.id;
      const apiUrl = process.env.API_URL || "http://localhost:3000"; // passe ggf. an
      try {

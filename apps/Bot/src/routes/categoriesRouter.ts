@@ -16,12 +16,12 @@ export const categoriesRouter = Router();
  */
 categoriesRouter.post("/", async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, isVisible, allowedRoles } = req.body;
     if (!name) {
       return res.status(400).json({ error: "Missing 'name' in body" });
     }
 
-    const discordChannelId = await createDiscordCategory(name);
+    const discordChannelId = await createDiscordCategory(name, isVisible, allowedRoles);
     return res.json({ ok: true, discordChannelId });
   } catch (err) {
     logger.error("[Bot] createDiscordCategory Error:", err);
@@ -36,13 +36,13 @@ categoriesRouter.post("/", async (req, res) => {
  */
 categoriesRouter.patch("/", async (req, res) => {
   try {
-    const { id, newName } = req.body;
+    const { id, newName, isVisible, allowedRoles } = req.body;
     if (!id || !newName) {
       return res
         .status(400)
         .json({ error: "Missing 'id' or 'newName' in body" });
     }
-    await renameDiscordCategory(id, newName);
+    await renameDiscordCategory(id, newName, isVisible, allowedRoles);
     return res.json({ ok: true });
   } catch (err) {
     logger.error("[Bot] renameDiscordCategory Error:", err);

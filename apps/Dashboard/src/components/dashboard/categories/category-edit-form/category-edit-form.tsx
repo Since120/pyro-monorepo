@@ -15,8 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import { deleteCategory, updateCategory, getCategories } from "@/services/categories"; 
-// ^ Achte drauf, dass "getCategories" importiert ist.
+import { deleteCategoryHard, updateCategory, getCategories } from "@/services/categories";
 
 import { NameFieldSection } from "@/components/dashboard/categories/shared/NameFieldSection";
 import { RoleSelectSection } from "@/components/dashboard/categories/shared/RoleSelectSection";
@@ -137,7 +136,7 @@ export function CategoryEditForm({ category }: CategoryEditFormProps) {
     if (!confirmed) return;
 
     try {
-      await deleteCategory(category.id);
+      await deleteCategoryHard(category.id);
       router.push("/dashboard/categories");
     } catch (err) {
       console.error("handleDelete error:", err);
@@ -204,45 +203,36 @@ export function CategoryEditForm({ category }: CategoryEditFormProps) {
           ))}
         </RadioGroup>
       </Stack>
-
-      {/* B) Name-Feld */}
-      <Stack spacing={2}>
-        <NameFieldSection
-          nameValue={name}
-          onNameChange={(val) => setName(val)}
-          maxLength={25}
-        />
-      </Stack>
-
-      {/* C) Rollen */}
-      <Stack spacing={2}>
-        <RoleSelectSection
-          selectedRoleIds={selectedRoleIds}
-          onChange={(newIds) => setSelectedRoleIds(newIds)}
-        />
-      </Stack>
-
       {/* D) Sichtbarkeit => Alle 3 Switches */}
       <Stack spacing={2}>
-        <VisibilitySwitches
-          isVisible={isVisible}
-          trackingActive={trackingActive}
-          sendSetup={sendSetup}
-          onChange={(partial) => {
-            if (partial.isVisible !== undefined) {
-              setIsVisible(partial.isVisible);
-            }
-            if (partial.trackingActive !== undefined) {
-              setTrackingActive(partial.trackingActive);
-              if (!partial.trackingActive) {
-                setSendSetup(false);
-              }
-            }
-            if (partial.sendSetup !== undefined) {
-              setSendSetup(partial.sendSetup);
-            }
-          }}
+      {/* Switches => Tracking immer */}
+      <VisibilitySwitches
+        isVisible={isVisible}
+        trackingActive={trackingActive}
+        sendSetup={sendSetup}
+        onChange={(partial) => {
+          if (partial.isVisible !== undefined) {
+        setIsVisible(partial.isVisible);
+      }
+          if (partial.trackingActive !== undefined) {
+        setTrackingActive(partial.trackingActive);
+          if (!partial.trackingActive) {
+        setSendSetup(false);
+      }
+    }
+    if (partial.sendSetup !== undefined) {
+      setSendSetup(partial.sendSetup);
+    }
+  }}
         />
+
+    {/* Rollen + KategorieSichtbarkeit erst bei trackingActive */}
+      {trackingActive && (
+      <RoleSelectSection
+      selectedRoleIds={selectedRoleIds}
+      onChange={(newIds) => setSelectedRoleIds(newIds)}
+      />
+      )} 
       </Stack>
 
       {/* E) Footer Buttons */}
