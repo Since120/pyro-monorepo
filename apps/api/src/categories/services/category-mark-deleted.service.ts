@@ -8,7 +8,10 @@ export class CategoryMarkDeletedService {
   constructor(private prisma: PrismaService) {}
 
   async markAsDeletedInDiscord(discordCategoryId: string) {
-    console.log('markAsDeletedInDiscord => discordCategoryId=', discordCategoryId);
+    console.log(
+      'markAsDeletedInDiscord => discordCategoryId=',
+      discordCategoryId,
+    );
 
     // (A) find record
     const cat = await this.prisma.category.findFirst({

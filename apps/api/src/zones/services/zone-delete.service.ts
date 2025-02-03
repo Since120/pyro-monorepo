@@ -8,9 +8,7 @@ import { VoiceChannelService } from '../voice-channel/voice-channel.service';
 export class ZoneDeleteService {
   private prisma = new PrismaClient();
 
-  constructor(
-    private readonly voiceChannelService: VoiceChannelService,
-  ) {}
+  constructor(private readonly voiceChannelService: VoiceChannelService) {}
 
   async deleteZone(zoneId: string) {
     // 1) remove VoiceChannels

@@ -55,46 +55,42 @@ export function CategoryDetailsStep({
 	};
 
 	return (
-		    <Stack spacing={4}>
-      {/* 1) Oberer Block: Name */}
-      <Stack spacing={3}>
-        <div>
-          <Typography variant="h6">Kategorie Details</Typography>
-        </div>
-        {/* Name-Feld */}
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1}
-          alignItems={{ xs: "stretch", sm: "flex-end" }}
-        >
-          <NameFieldSection nameValue={name} onNameChange={handleNameChange} />
-        </Stack>
-      </Stack>
+		<Stack spacing={4}>
+			{/* 1) Oberer Block: Name */}
+			<Stack spacing={3}>
+				<div>
+					<Typography variant="h6">Kategorie Details</Typography>
+				</div>
+				{/* Name-Feld */}
+				<Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "flex-end" }}>
+					<NameFieldSection nameValue={name} onNameChange={handleNameChange} />
+				</Stack>
+			</Stack>
 
-      {/* 2) Tracking-Switches => Tracking immer sichtbar */}
-      <VisibilitySwitches
-        isVisible={isVisible}
-        trackingActive={trackingActive}
-        sendSetup={sendSetup}
-        onChange={handleVisibilityChange}
-      />
+			{/* 2) Tracking-Switches => Tracking immer sichtbar */}
+			<VisibilitySwitches
+				isVisible={isVisible}
+				trackingActive={trackingActive}
+				sendSetup={sendSetup}
+				onChange={handleVisibilityChange}
+			/>
 
-      {/* 3) Rollen => erst wenn trackingActive=true */}
-      {trackingActive && (
-        <Stack spacing={3}>
-          <RoleSelectSection selectedRoleIds={tags} onChange={handleRoleIdsChange} />
-        </Stack>
-      )}
+			{/* 3) Rollen => erst wenn trackingActive=true */}
+			{trackingActive && (
+				<Stack spacing={3}>
+					<RoleSelectSection selectedRoleIds={tags} onChange={handleRoleIdsChange} />
+				</Stack>
+			)}
 
-      {/* 4) Buttons */}
-      <Stack direction="row" spacing={2} justifyContent="flex-end" alignItems="center">
-        <Button color="secondary" startIcon={<ArrowLeftIcon />} onClick={onBack}>
-          Back
-        </Button>
-        <Button variant="contained" endIcon={<ArrowRightIcon />} onClick={onNext}>
-          Weiter
-        </Button>
-      </Stack>
-    </Stack>
-   );
- }
+			{/* 4) Buttons */}
+			<Stack direction="row" spacing={2} justifyContent="flex-end" alignItems="center">
+				<Button color="secondary" startIcon={<ArrowLeftIcon />} onClick={onBack}>
+					Back
+				</Button>
+				<Button variant="contained" endIcon={<ArrowRightIcon />} onClick={onNext}>
+					Weiter
+				</Button>
+			</Stack>
+		</Stack>
+	);
+}

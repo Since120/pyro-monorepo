@@ -1,4 +1,5 @@
-// Pfad: apps/api/src/zones/zones.controller.ts
+// apps/api/src/zones/zones.controller.ts
+
 import {
   Controller,
   Get,
@@ -9,6 +10,7 @@ import {
   Param,
   HttpException,
   HttpStatus,
+  Query, // <-- WICHTIG
 } from '@nestjs/common';
 import { ZonesService } from './zones.service';
 
@@ -17,24 +19,33 @@ export class ZonesController {
   constructor(private readonly zonesService: ZonesService) {}
 
   @Get()
-  async findAll() {
+  async findAll(@Query('categoryId') catId?: string) {
     try {
-      return await this.zonesService.findAll();
+      return await this.zonesService.findAll(catId);
     } catch (err) {
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
   @Post()
-  async create(@Body() body: {
-    zoneKey: string;
-    zoneName: string;
-    minutesRequired?: number;
-    pointsGranted?: number;
-    categoryId?: string;
-  }) {
+  async create(
+    @Body()
+    body: {
+      zoneKey: string;
+      zoneName: string;
+      minutesRequired?: number;
+      pointsGranted?: number;
+      categoryId?: string;
+    },
+  ) {
     if (!body.zoneKey || !body.zoneName) {
-      throw new HttpException('zoneKey & zoneName required', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'zoneKey & zoneName required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     try {
       return await this.zonesService.createZone({
@@ -42,14 +53,18 @@ export class ZonesController {
         categoryId: body.categoryId || null,
       });
     } catch (err) {
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
   @Patch(':id')
   async update(
     @Param('id') zoneId: string,
-    @Body() body: {
+    @Body()
+    body: {
       zoneKey?: string;
       zoneName?: string;
       minutesRequired?: number;
@@ -66,7 +81,10 @@ export class ZonesController {
         categoryId: body.categoryId || null,
       });
     } catch (err) {
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -78,7 +96,10 @@ export class ZonesController {
     try {
       return await this.zonesService.deleteZone(zoneId);
     } catch (err) {
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -91,7 +112,10 @@ export class ZonesController {
       const result = await this.zonesService.deleteManyZones(body.zoneIds);
       return { deletedCount: result.count };
     } catch (err) {
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

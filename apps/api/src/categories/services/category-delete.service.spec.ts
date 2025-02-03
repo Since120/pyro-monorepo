@@ -7,7 +7,9 @@ import { SetupService } from '../../setup/setup.service';
 import axios from 'axios';
 
 jest.mock('axios');
-const mockAxiosDelete = axios.delete as jest.MockedFunction<typeof axios.delete>;
+const mockAxiosDelete = axios.delete as jest.MockedFunction<
+  typeof axios.delete
+>;
 
 describe('CategoryDeleteService (Unit)', () => {
   let service: CategoryDeleteService;
@@ -51,7 +53,9 @@ describe('CategoryDeleteService (Unit)', () => {
 
   it('deleteCategory => throws if not found', async () => {
     (prisma.category.findUnique as jest.Mock).mockResolvedValue(null);
-    await expect(service.deleteCategory('catX')).rejects.toThrow('Category not found');
+    await expect(service.deleteCategory('catX')).rejects.toThrow(
+      'Category not found',
+    );
   });
 
   it('deleteCategory => throws if zones exist', async () => {
@@ -89,7 +93,7 @@ describe('CategoryDeleteService (Unit)', () => {
     });
     (prisma.category.delete as jest.Mock).mockResolvedValue({ id: 'catHard' });
 
-    mockAxiosDelete.mockRejectedValueOnce(new Error('fail')); 
+    mockAxiosDelete.mockRejectedValueOnce(new Error('fail'));
     // Im Hard-Delete Code => wir loggen nur => no throw
 
     const res = await service.deleteCategoryHard('catHard');

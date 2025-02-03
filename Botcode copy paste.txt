@@ -1,0 +1,6335 @@
+API Nest.js:
+
+// Pfad: apps/api/src/categories/services/category-create.service.ts
+
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { SetupService } from '../../setup/setup.service';
+import axios from 'axios';
+
+@Injectable()
+export class CategoryCreateService {
+  constructor(
+    private prisma: PrismaService,
+    private setupService: SetupService,
+  ) {}
+
+  async createCategory(data: {
+    name: string;
+    categoryType: string;
+    isVisible?: boolean;
+    allowedRoles?: string[];
+    trackingActive?: boolean;
+    sendSetup?: boolean;
+  }) {
+    // (A) DB => create
+    const newCat = await this.prisma.category.create({
+      data: {
+        name: data.name,
+        categoryType: data.categoryType,
+        isVisible: data.isVisible ?? true,
+        allowedRoles: data.allowedRoles ?? [],
+        trackingActive: data.trackingActive ?? false,
+        sendSetup: data.sendSetup ?? false,
+      },
+    });
+
+    // (B) Bot => POST /discord/categories
+    try {
+      const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+      const response = await axios.post(`${botUrl}/discord/categories`, {
+        name: newCat.name,
+        isVisible: newCat.isVisible,
+        allowedRoles: newCat.allowedRoles,
+      });
+      const { discordChannelId } = response.data;
+
+      if (!discordChannelId) {
+        throw new Error('No channelId returned');
+      }
+
+      // (C) DB => update discordCategoryId
+      const finalCat = await this.prisma.category.update({
+        where: { id: newCat.id },
+        data: { discordCategoryId: discordChannelId },
+      });
+
+      // (D) If sendSetup=true => activate setup
+      if (finalCat.sendSetup === true) {
+        try {
+          await this.setupService.activateSetup(finalCat.id);
+        } catch (err) {
+          console.error('Error in setupService.activateSetup:', err);
+        }
+      }
+
+      return finalCat;
+    } catch (err) {
+      console.error('Error while creating Discord category:', err);
+      throw new HttpException(
+        'Bot could not create the Discord category.',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+}
+
+// Pfad: apps/api/src/categories/services/category-delete.service.ts
+
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { SetupService } from '../../setup/setup.service';
+import axios from 'axios';
+
+@Injectable()
+export class CategoryDeleteService {
+  constructor(
+    private prisma: PrismaService,
+    private setupService: SetupService,
+  ) {}
+
+  /**
+   * 4) DELETE (Soft-Delete)
+   */
+  async deleteCategory(catId: string) {
+    // (A) load category
+    const cat = await this.prisma.category.findUnique({
+      where: { id: catId },
+    });
+    if (!cat) {
+      throw new HttpException('Category not found', HttpStatus.NOT_FOUND);
+    }
+
+    // (B) remove setup if active
+    await this.setupService.deactivateSetup(catId);
+
+    // (C) check zones
+    const zoneCount = await this.prisma.zone.count({
+      where: { categoryId: catId },
+    });
+    if (zoneCount > 0) {
+      throw new HttpException(
+        'Category cannot be deleted while Zones still exist!',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // (D) remove in Discord if needed
+    if (cat.discordCategoryId) {
+      try {
+        const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+        await axios.delete(`${botUrl}/discord/categories/${cat.discordCategoryId}`);
+      } catch (err) {
+        console.error('Error while deleting Discord category:', err);
+        throw new HttpException(
+          'Bot could not delete the Discord category.',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+    } else {
+      console.warn(`deleteCategory: Category ${catId} has NO discordCategoryId => skip Discord delete`);
+    }
+
+    // (E) Soft-delete => set deletedInDiscord=true
+    return this.prisma.category.update({
+      where: { id: catId },
+      data: { deletedInDiscord: true },
+    });
+  }
+
+  /**
+   * 7) HARD-DELETE
+   */
+  async deleteCategoryHard(catId: string) {
+    // 1) check if zones exist
+    const zoneCount = await this.prisma.zone.count({
+      where: { categoryId: catId },
+    });
+    if (zoneCount > 0) {
+      throw new HttpException(
+        'Category cannot be hard-deleted while Zones still exist!',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // 2) remove setup if active
+    await this.setupService.deactivateSetup(catId);
+
+    // 3) remove from Discord if needed
+    const cat = await this.prisma.category.findUnique({ where: { id: catId } });
+    if (cat?.discordCategoryId) {
+      const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+      try {
+        await axios.delete(`${botUrl}/discord/categories/${cat.discordCategoryId}`);
+      } catch (err) {
+        console.error('[HARD-DELETE] Error while deleting Discord category:', err);
+      }
+    }
+
+    // 4) truly remove DB record
+    return this.prisma.category.delete({
+      where: { id: catId },
+    });
+  }
+}
+
+// Pfad: apps/api/src/categories/services/category-mark-deleted.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class CategoryMarkDeletedService {
+  constructor(private prisma: PrismaService) {}
+
+  async markAsDeletedInDiscord(discordCategoryId: string) {
+    console.log('markAsDeletedInDiscord => discordCategoryId=', discordCategoryId);
+
+    // (A) find record
+    const cat = await this.prisma.category.findFirst({
+      where: { discordCategoryId },
+    });
+    console.log('Found Category:', cat);
+
+    if (!cat) {
+      throw new Error(`Category not found for channelId=${discordCategoryId}`);
+    }
+
+    // (B) DB => "deletedInDiscord = true"
+    const updated = await this.prisma.category.update({
+      where: { id: cat.id },
+      data: { deletedInDiscord: true },
+    });
+    console.log('Update done =>', updated);
+    return updated;
+  }
+}
+
+// Pfad: apps/api/src/categories/services/category-restore.service.ts
+
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import axios from 'axios';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class CategoryRestoreService {
+  constructor(private prisma: PrismaService) {}
+
+  async restoreCategoryInDiscord(catId: string) {
+    // (A) load from DB
+    const cat = await this.prisma.category.findUnique({ where: { id: catId } });
+    if (!cat) {
+      throw new HttpException('Category not found', HttpStatus.NOT_FOUND);
+    }
+
+    // (B) check if it's actually deletedInDiscord
+    if (!cat.deletedInDiscord) {
+      throw new HttpException('Category is not marked as deleted.', HttpStatus.BAD_REQUEST);
+    }
+
+    // (C) Bot => create new
+    try {
+      const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+      const response = await axios.post(`${botUrl}/discord/categories`, {
+        name: cat.name,
+      });
+      const { discordChannelId } = response.data;
+      if (!discordChannelId) {
+        throw new Error('No channelId returned from Bot');
+      }
+
+      // (D) DB => update
+      const updated = await this.prisma.category.update({
+        where: { id: cat.id },
+        data: {
+          discordCategoryId: discordChannelId,
+          deletedInDiscord: false,
+        },
+      });
+
+      // (E) re-parent existing voice channels
+      try {
+        const zones = await this.prisma.zone.findMany({
+          where: { categoryId: cat.id },
+        });
+
+        for (const z of zones) {
+          const voiceChannels = await this.prisma.voiceChannel.findMany({
+            where: {
+              zoneId: z.id,
+              deletedInDiscord: false,
+              discordChannelId: { not: null },
+            },
+          });
+
+          for (const vc of voiceChannels) {
+            await axios.patch(`${botUrl}/discord/voice-channels/${vc.discordChannelId}`, {
+              newCategoryId: discordChannelId,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn(
+          'restoreCategoryInDiscord -> error while re-parenting voice channels:',
+          err,
+        );
+      }
+
+      return updated;
+    } catch (err) {
+      console.error('restoreCategoryInDiscord -> Bot error:', err);
+      throw new HttpException(
+        'Bot could not create the Discord category again.',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+}
+
+
+// Pfad: apps/api/src/categories/services/category-update.service.ts
+
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import axios from 'axios';
+import { PrismaService } from '../../prisma/prisma.service';
+import { SetupService } from '../../setup/setup.service';
+
+@Injectable()
+export class CategoryUpdateService {
+  constructor(
+    private prisma: PrismaService,
+    private setupService: SetupService,
+  ) {}
+
+  async updateCategory(
+    catId: string,
+    data: Partial<{
+      name: string;
+      categoryType: string;
+      isVisible: boolean;
+      allowedRoles: string[];
+      trackingActive: boolean;
+      sendSetup: boolean;
+    }>,
+  ) {
+    // (A) load old data
+    const oldCat = await this.prisma.category.findUnique({
+      where: { id: catId },
+    });
+    if (!oldCat) {
+      throw new HttpException('Category not found (oldCat)', HttpStatus.NOT_FOUND);
+    }
+    const wasSetup = oldCat.sendSetup === true;
+
+    // (B) DB => update
+    const updated = await this.prisma.category.update({
+      where: { id: catId },
+      data,
+    });
+    const isNowSetup = updated.sendSetup === true;
+
+    // (C) If name changed => rename in Discord
+    if (data.name) {
+      try {
+        if (!updated.discordCategoryId) {
+          console.warn(
+            `updateCategory: Category ${catId} has no discordCategoryId => skip rename`,
+          );
+        } else {
+          const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+          await axios.patch(`${botUrl}/discord/categories`, {
+            id: updated.discordCategoryId,
+            newName: data.name,
+            isVisible: data.isVisible,
+            allowedRoles: data.allowedRoles,
+          });
+        }
+      } catch (err) {
+        console.error('Error while updating Discord category:', err);
+        throw new HttpException(
+          'Bot could not rename the Discord category.',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+    }
+
+    // (D) Setup toggle logic
+    // 1) false -> true
+    if (!wasSetup && isNowSetup) {
+      await this.removeZoneVoiceChannelsWithoutSettingDeleted(catId);
+      // Activate Setup
+      try {
+        const apiUrl = process.env.API_URL || 'http://localhost:3004';
+        await axios.post(`${apiUrl}/setup/activate`, { categoryId: catId });
+      } catch (err) {
+        console.error('Error calling /setup/activate:', err);
+      }
+    }
+
+    // 2) true -> false
+    if (wasSetup && !isNowSetup) {
+      // remove setup-channels
+      await this.setupService.deactivateSetup(catId);
+      // restore zone-voice-channels
+      await this.restoreZoneVoiceChannels(catId);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Deletes all zone voice channels in Discord (but sets `discordChannelId=null` in DB, not deletedInDiscord).
+   */
+  private async removeZoneVoiceChannelsWithoutSettingDeleted(categoryId: string) {
+    const zones = await this.prisma.zone.findMany({
+      where: { categoryId },
+      include: { voiceChannels: true },
+    });
+
+    const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+    for (const z of zones) {
+      for (const vc of z.voiceChannels) {
+        if (!vc.discordChannelId) continue; // already null => skip
+        // A) remove in Discord
+        try {
+          await axios.delete(`${botUrl}/discord/voice-channels/${vc.discordChannelId}`);
+        } catch (err) {
+          console.warn('Error removing VC (Setup-Switch):', err);
+        }
+        // B) DB => set discordChannelId=null
+        await this.prisma.voiceChannel.update({
+          where: { id: vc.id },
+          data: { discordChannelId: null },
+        });
+      }
+    }
+  }
+
+  /**
+   * Recreates voice channels for all zones that have `discordChannelId=null` & `deletedInDiscord=false`.
+   */
+  private async restoreZoneVoiceChannels(categoryId: string) {
+    const zones = await this.prisma.zone.findMany({
+      where: { categoryId },
+      include: { voiceChannels: true },
+    });
+    for (const z of zones) {
+      for (const vc of z.voiceChannels) {
+        if (!vc.discordChannelId && !vc.deletedInDiscord) {
+          await this.recreateOneVoiceChannel(vc);
+        }
+      }
+    }
+  }
+
+  /**
+   * Creates ONE voice channel in Discord, updates DB => discordChannelId
+   */
+  private async recreateOneVoiceChannel(vc: { id: string; zoneId: string | null }) {
+    if (!vc.zoneId) return;
+
+    const zone = await this.prisma.zone.findUnique({
+      where: { id: vc.zoneId },
+      include: { category: true },
+    });
+    if (!zone?.category?.discordCategoryId) return;
+
+    const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+    try {
+      const resp = await axios.post(`${botUrl}/discord/voice-channels`, {
+        channelName: zone.zoneName,
+        categoryId: zone.category.discordCategoryId,
+      });
+      const newId = resp.data.discordChannelId;
+
+      if (newId) {
+        await this.prisma.voiceChannel.update({
+          where: { id: vc.id },
+          data: { discordChannelId: newId },
+        });
+      }
+    } catch (err) {
+      console.warn('Error in recreateOneVoiceChannel:', err);
+    }
+  }
+}
+
+// Pfad: apps/api/src/categories/categories.controller.ts
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+import { CategoriesService } from './categories.service';
+
+@Controller('categories')
+export class CategoriesController {
+  constructor(private readonly categoriesService: CategoriesService) {}
+
+  // 1) GET /categories
+  @Get()
+  async findAll() {
+    try {
+      return await this.categoriesService.findAll();
+    } catch (err) {
+      console.error('Error in findAll():', err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // 2) POST /categories
+  @Post()
+  async create(@Body() body: {
+    name: string;
+    categoryType: string;
+    isVisible?: boolean;
+    allowedRoles?: string[];
+    trackingActive?: boolean;
+    sendSetup?: boolean;
+  }) {
+    if (!body.name || !body.categoryType) {
+      throw new HttpException('name & categoryType required', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      return await this.categoriesService.createCategory(body);
+    } catch (err) {
+      console.error('Error in create():', err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // 3) PATCH /categories/discord-deleted (Route for the Bot)
+  @Patch('discord-deleted')
+  async markAsDeletedInDiscord(@Body() body: { discordCategoryId: string }) {
+    if (!body.discordCategoryId) {
+      throw new HttpException('Missing discordCategoryId', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      const res = await this.categoriesService.markAsDeletedInDiscord(
+        body.discordCategoryId,
+      );
+      return { ok: true, data: res };
+    } catch (err) {
+      console.error('Error in markAsDeletedInDiscord:', err);
+      throw new HttpException('Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // 4) PATCH /categories/:id => Update
+  @Patch(':id')
+  async update(@Param('id') catId: string, @Body() body: {
+    name?: string;
+    categoryType?: string;
+    isVisible?: boolean;
+    allowedRoles?: string[];
+    trackingActive?: boolean;
+    sendSetup?: boolean;
+  }) {
+    if (!catId) {
+      throw new HttpException('Missing categoryId', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      return await this.categoriesService.updateCategory(catId, body);
+    } catch (err) {
+      console.error('Error in update():', err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // 5) DELETE /categories/:id (Soft Delete)
+  @Delete(':id')
+  async remove(@Param('id') catId: string) {
+    if (!catId) {
+      throw new HttpException('Missing categoryId', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      return await this.categoriesService.deleteCategory(catId);
+    } catch (err) {
+      console.error('Error in remove():', err);
+      if (err instanceof HttpException) throw err;
+
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // 6) PATCH /categories/restore/:id
+  @Patch('restore/:id')
+  async restoreCategoryInDiscord(@Param('id') catId: string) {
+    try {
+      const result = await this.categoriesService.restoreCategoryInDiscord(catId);
+      return { ok: true, data: result };
+    } catch (err) {
+      console.error('Error in restoreCategoryInDiscord:', err);
+      if (err instanceof HttpException) throw err;
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // 7) DELETE /categories/:id/hard
+  @Delete(':id/hard')
+  async removeHard(@Param('id') catId: string) {
+    if (!catId) {
+      throw new HttpException('Missing categoryId', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      return await this.categoriesService.deleteCategoryHard(catId);
+    } catch (err) {
+      console.error('Error in removeHard():', err);
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+}
+
+// Pfad: apps/api/src/categories/categories.module.ts
+import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
+import { SetupModule } from '../setup/setup.module';
+
+// Controller & Haupt-Service:
+import { CategoriesController } from './categories.controller';
+import { CategoriesService } from './categories.service';
+
+// Sub-Services:
+import { CategoryCreateService } from './services/category-create.service';
+import { CategoryUpdateService } from './services/category-update.service';
+import { CategoryDeleteService } from './services/category-delete.service';
+import { CategoryMarkDeletedService } from './services/category-mark-deleted.service';
+import { CategoryRestoreService } from './services/category-restore.service';
+
+@Module({
+  imports: [PrismaModule, SetupModule],
+  controllers: [CategoriesController],
+  providers: [
+    CategoriesService,     // Haupt-Service (Delegation + findAll)
+    CategoryCreateService,
+    CategoryUpdateService,
+    CategoryDeleteService,
+    CategoryMarkDeletedService,
+    CategoryRestoreService,
+  ],
+  exports: [CategoriesService], // optional
+})
+export class CategoriesModule {}
+
+
+// Pfad: apps/api/src/categories/categories.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CategoryCreateService } from './services/category-create.service';
+import { CategoryUpdateService } from './services/category-update.service';
+import { CategoryDeleteService } from './services/category-delete.service';
+import { CategoryMarkDeletedService } from './services/category-mark-deleted.service';
+import { CategoryRestoreService } from './services/category-restore.service';
+
+@Injectable()
+export class CategoriesService {
+  constructor(
+    private prisma: PrismaService,
+
+    // Unsere Sub-Services:
+    private categoryCreate: CategoryCreateService,
+    private categoryUpdate: CategoryUpdateService,
+    private categoryDelete: CategoryDeleteService,
+    private categoryMarkDeleted: CategoryMarkDeletedService,
+    private categoryRestore: CategoryRestoreService,
+  ) {}
+
+  /**
+   * 1) READ ALL
+   */
+  findAll() {
+    // Standard: Zeigt alle Categories inkl. deletedInDiscord usw.
+    // (evtl. where: { deletedInDiscord: false } falls du nur "aktive" willst)
+    return this.prisma.category.findMany();
+  }
+
+  /**
+   * 2) CREATE - Delegation
+   */
+  createCategory(data: {
+    name: string;
+    categoryType: string;
+    isVisible?: boolean;
+    allowedRoles?: string[];
+    trackingActive?: boolean;
+    sendSetup?: boolean;
+  }) {
+    return this.categoryCreate.createCategory(data);
+  }
+
+  /**
+   * 3) UPDATE - Delegation
+   */
+  updateCategory(
+    catId: string,
+    data: Partial<{
+      name: string;
+      categoryType: string;
+      isVisible: boolean;
+      allowedRoles: string[];
+      trackingActive: boolean;
+      sendSetup: boolean;
+    }>,
+  ) {
+    return this.categoryUpdate.updateCategory(catId, data);
+  }
+
+  /**
+   * 4) DELETE - Delegation
+   */
+  deleteCategory(catId: string) {
+    return this.categoryDelete.deleteCategory(catId);
+  }
+
+  /**
+   * 4b) HARD-DELETE
+   */
+  deleteCategoryHard(catId: string) {
+    return this.categoryDelete.deleteCategoryHard(catId);
+  }
+
+  /**
+   * 5) MARK AS DELETED
+   */
+  markAsDeletedInDiscord(discordCategoryId: string) {
+    return this.categoryMarkDeleted.markAsDeletedInDiscord(discordCategoryId);
+  }
+
+  /**
+   * 6) RESTORE
+   */
+  restoreCategoryInDiscord(catId: string) {
+    return this.categoryRestore.restoreCategoryInDiscord(catId);
+  }
+}
+
+import { Controller, Get, Post, Body } from '@nestjs/common';
+import { AppService } from './app.service';
+
+@Controller()
+export class AppController {
+  constructor(private readonly appService: AppService) {}
+
+  @Get('users')
+  async getUsers() {
+    return this.appService.getAllUsers();
+  }
+
+  @Post('users')
+  async addUser(@Body('name') name: string) {
+    return this.appService.createUser(name);
+  }
+}
+
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+// Import unser PrismaModule
+import { PrismaModule } from './prisma.module';
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
+
+@Injectable()
+export class AppService {
+  constructor(private prisma: PrismaService) {}
+
+  async getAllUsers() {
+    return this.prisma.user.findMany();
+  }
+
+  async createUser(name: string) {
+    return this.prisma.user.create({
+      data: { username: name },
+    });
+  }
+}
+
+import { Module } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
+
+@Module({
+  providers: [PrismaService],
+  exports: [PrismaService], // Damit andere Module PrismaService nutzen können
+})
+export class PrismaModule {}
+
+
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
+  async onModuleInit() {
+    await this.$connect();
+  }
+
+  async onModuleDestroy() {
+    await this.$disconnect();
+  }
+}
+
+
+// Pfad: apps/api/src/roles/roles.controller.ts
+
+import { Controller, Get } from '@nestjs/common';
+import { RolesService } from './roles.service';
+
+@Controller('roles')
+export class RolesController {
+  constructor(private readonly rolesService: RolesService) {}
+
+  @Get()
+  async getAllRoles() {
+    // Ruft Service => der ruft Bot => Daten => Return
+    // => Endpoint: GET /roles
+    return this.rolesService.getAllRoles();
+  }
+}
+
+// Pfad: apps/api/src/roles/roles.module.ts
+
+import { Module } from '@nestjs/common';
+import { RolesController } from './roles.controller';
+import { RolesService } from './roles.service';
+
+@Module({
+  controllers: [RolesController],
+  providers: [RolesService],
+})
+export class RolesModule {}
+
+// Pfad: apps/api/src/roles/roles.service.ts
+
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import axios from 'axios';
+
+@Injectable()
+export class RolesService {
+  /**
+   * Fragt beim Bot an => GET /discord/roles
+   * Gibt { roles: [ ... ]} zurück
+   */
+  async getAllRoles() {
+    try {
+      const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+      const resp = await axios.get(`${botUrl}/discord/roles`);
+      // resp.data z. B. { roles: [...] }
+
+      return resp.data;
+      // => du könntest "return resp.data.roles" machen,
+      //    falls du nur das roles-Array weitergeben willst
+    } catch (err) {
+      throw new HttpException('Bot not reachable', HttpStatus.BAD_GATEWAY);
+    }
+  }
+}
+
+
+// apps/api/src/setup/setup.controller.ts
+import { Controller, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { SetupService } from './setup.service';
+
+@Controller('setup')
+export class SetupController {
+  constructor(private setupService: SetupService) {}
+
+  @Post('activate')
+  async activate(@Body() body: { categoryId: string }) {
+    if (!body.categoryId) {
+      throw new HttpException('Missing categoryId', HttpStatus.BAD_REQUEST);
+    }
+    const setup = await this.setupService.activateSetup(body.categoryId);
+    return { ok: true, data: setup };
+  }
+
+  @Post('deactivate')
+  async deactivate(@Body() body: { categoryId: string }) {
+    if (!body.categoryId) {
+      throw new HttpException('Missing categoryId', HttpStatus.BAD_REQUEST);
+    }
+    await this.setupService.deactivateSetup(body.categoryId);
+    return { ok: true };
+  }
+}
+
+// apps/api/src/setup/setup.module.ts
+import { Module } from '@nestjs/common';
+import { SetupController } from './setup.controller';
+import { SetupService } from './setup.service';
+import { PrismaModule } from '../prisma/prisma.module';
+
+@Module({
+  imports: [PrismaModule], // Damit wir PrismaService injizieren können
+  controllers: [SetupController],
+  providers: [SetupService],
+  exports: [SetupService],
+})
+export class SetupModule {}
+
+
+// apps/api/src/setup/setup.service.ts
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import axios from 'axios';
+import { PrismaService } from '../prisma/prisma.service';
+import { SetupChannels } from '@prisma/client';
+
+@Injectable()
+export class SetupService {
+  constructor(private prisma: PrismaService) {}
+
+  /**
+   * 1) Prüfen, ob es schon SetupChannels-Eintrag für categoryId gibt
+   * 2) Wenn nicht, lege Textkanal an (Bot-Call)
+   * 3) Sende erste Embed mit dem "Setup"-Button
+   * 4) Speichere die Kanal-ID und ggf. die Nachricht-ID in SetupChannels
+   */
+  async activateSetup(categoryId: string): Promise<SetupChannels> {
+    // (A) Check category exist
+    const cat = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    if (!cat) {
+      throw new HttpException('Category not found', HttpStatus.BAD_REQUEST);
+    }
+
+    // (B) Check if SetupChannels already exist
+    let existing = await this.prisma.setupChannels.findFirst({ where: { categoryId } });
+    if (existing) {
+      // Optional: Refresh? or do nothing
+      return existing;
+    }
+
+    // (C) Bot => Erstelle TextChannel
+    const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+    // Wir bauen den Channel-Namen und ob er Private sein soll
+    const channelName = `SETUP-${cat.name}`.toUpperCase();
+    let createdChannelId: string | null = null;
+
+    try {
+      const resp = await axios.post(`${botUrl}/discord/text-channels`, {
+        channelName,
+        parentCategoryId: cat.discordCategoryId, // optional, falls du es in der gleichen Kategorie willst
+        private: true, // z.B. nur Admins
+      });
+      createdChannelId = resp.data.discordChannelId;
+    } catch (error) {
+      throw new HttpException(
+        'Fehler beim Erstellen des Textkanals im Bot',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    if (!createdChannelId) {
+      throw new HttpException(
+        'Bot hat keine channelId zurückgeliefert',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+        // (C2) Bot => Erstelle Voice-Kanal (Warteraum)
+    // Achtung: Endpunkt /discord/voice-channels erwartet "categoryId" und "channelName"
+    // => Wir verwenden cat.discordCategoryId als "categoryId"
+    // => z.B. WARTERAUM-KATEGORIE
+    let createdVoiceId: string | null = null;
+    try {
+      const vcResp = await axios.post(`${botUrl}/discord/voice-channels`, {
+        channelName: `WARTERAUM-${cat.name}`.toUpperCase(),
+        categoryId: cat.discordCategoryId,  // Muss so heißen (nicht parentCategoryId!)
+      });
+      createdVoiceId = vcResp.data.discordChannelId;
+    } catch (error) {
+      throw new HttpException(
+        'Fehler beim Erstellen des Voice-Warteraums im Bot',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    if (!createdVoiceId) {
+      throw new HttpException(
+        'Bot hat keine voiceChannelId zurückgeliefert',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+
+    // (D) Bot => Sende eine Embed-Nachricht mit Button "Setup"
+    let messageId: string | null = null;
+    try {
+      const embedResp = await axios.post(`${botUrl}/discord/messages`, {
+        channelId: createdChannelId,
+        embed: {
+          title: 'Kategorie-Setup',
+          description: 'Klicke auf den Button, um das Setup zu starten.',
+        },
+        components: [
+          {
+            type: 'button',
+            label: 'Setup',
+            style: 'primary',
+            customId: 'setup:start', // => Dein customId
+          },
+        ],
+      });
+      messageId = embedResp.data.messageId;
+    } catch (error) {
+      throw new HttpException(
+        'Fehler beim Senden der Setup-Nachricht',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+
+    // (E) SetupChannels in DB anlegen
+    const newSetup = await this.prisma.setupChannels.create({
+      data: {
+        categoryId: cat.id,
+        textChannelId: createdChannelId,
+        voiceChannelId: createdVoiceId,
+        embedMessageId: messageId || undefined,
+      },
+    });
+
+    return newSetup;
+  }
+
+    /**
+     * Löscht die erstellten Setup-Kanäle (Text + Voice)
+     * und entfernt den DB-Eintrag in setupChannels.
+     */
+    async deactivateSetup(categoryId: string): Promise<void> {
+      // 1) Eintrag suchen
+      const sc = await this.prisma.setupChannels.findFirst({
+        where: { categoryId },
+      });
+      if (!sc) {
+        // Kein Setup für diese Kategorie => nichts zu tun
+        return;
+      }
+  
+      const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+  
+      // 2) TextChannel entfernen, falls vorhanden
+      if (sc.textChannelId) {
+        try {
+          await axios.delete(`${botUrl}/discord/text-channels/${sc.textChannelId}`);
+          // Du hast noch keinen "DELETE /discord/text-channels/:id" Endpoint?
+          // Dann könntest du  "voice-channels" Endpoint klonen 
+          // und analog "type=GuildText" löschen.
+        } catch (err) {
+          console.warn('Fehler beim Löschen des Setup-TextChannels:', err);
+        }
+      }
+  
+      // 3) VoiceChannel entfernen, falls vorhanden
+      if (sc.voiceChannelId) {
+        try {
+          await axios.delete(`${botUrl}/discord/voice-channels/${sc.voiceChannelId}`);
+        } catch (err) {
+          console.warn('Fehler beim Löschen des Setup-VoiceChannels:', err);
+        }
+      }
+  
+      // 4) DB-Eintrag löschen
+      await this.prisma.setupChannels.delete({
+        where: { id: sc.id },
+      });
+    }
+}
+
+
+// apps/api/src/tracking/tracking.controller.ts
+import { Body, Controller, HttpException, HttpStatus, Post } from '@nestjs/common';
+import { TrackingService } from './tracking.service';
+
+@Controller('tracking')
+export class TrackingController {
+  constructor(private readonly trackingService: TrackingService) {}
+
+  /**
+   * POST /tracking/join
+   * Body: { userId, zoneId, userRoles: string[] }
+   */
+  @Post('join')
+  async userJoinedZone(@Body() body: {
+    userId?: string;
+    zoneId?: string;
+    userRoles?: string[];
+  }) {
+    if (!body.userId || !body.zoneId || !body.userRoles) {
+      throw new HttpException(
+        'Missing userId, zoneId or userRoles',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.trackingService.userJoinedZone({
+      userId: body.userId,
+      zoneId: body.zoneId,
+      userRoles: body.userRoles,
+    });
+
+    return { ok: true };
+  }
+
+  /**
+   * POST /tracking/leave
+   * Body: { userId, zoneId }
+   */
+  @Post('leave')
+  async userLeftZone(@Body() body: { userId?: string; zoneId?: string }) {
+    if (!body.userId || !body.zoneId) {
+      throw new HttpException(
+        'Missing userId or zoneId',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.trackingService.userLeftZone({
+      userId: body.userId,
+      zoneId: body.zoneId,
+    });
+
+    return { ok: true };
+  }
+}
+
+// apps/api/src/tracking/tracking.module.ts
+import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module'; 
+// Oder falls du in prisma.module.ts deinen PrismaService exportierst
+// import { PrismaService } from '../prisma/prisma.service';
+
+import { TrackingService } from './tracking.service';
+import { TrackingController } from './tracking.controller';
+
+@Module({
+  imports: [PrismaModule],       // <-- Damit wir PrismaService nutzen können
+  controllers: [TrackingController],
+  providers: [TrackingService],
+  exports: [TrackingService],    // <-- optional, falls andere Module den Service importieren sollen
+})
+export class TrackingModule {}
+
+// apps/api/src/tracking/tracking.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class TrackingService {
+  constructor(private prisma: PrismaService) {}
+
+  /**
+   * Wenn ein User in einen VoiceChannel joint,
+   *  => Wir prüfen: Zu welcher Zone gehört der Channel?
+   *  => Hat user mind. 1 Rolle, die in category.allowedRoles enthalten ist?
+   *  => Dann legen wir (falls nicht existiert) ein userZoneStats an
+   *     oder setzen lastJoinTimestamp neu.
+   */
+  async userJoinedZone(params: {
+    userId: string;
+    zoneId: string;
+    userRoles: string[];  // z.B. ["1234567890", "9876543210", ...]
+  }) {
+    const { userId, zoneId, userRoles } = params;
+
+    // 1) Zone + Category laden
+    const zone = await this.prisma.zone.findUnique({
+      where: { id: zoneId },
+      include: {
+        category: true, // => hat .allowedRoles
+      },
+    });
+    if (!zone || !zone.category) {
+      // Kein passender Datensatz => abbrechen
+      return;
+    }
+
+    const allowedRoles = zone.category.allowedRoles || [];
+    // Schnittmenge
+    const hasIntersection = allowedRoles.some((r) => userRoles.includes(r));
+    if (!hasIntersection) {
+      // => user hat KEINE Rolle, die getrackt wird => NICHTS tun
+      return;
+    }
+
+    // => user wird getrackt
+    // 2) UserZoneStats finden/erstellen
+    let stats = await this.prisma.userZoneStats.findFirst({
+      where: { userId, zoneId },
+    });
+    if (!stats) {
+      // neu anlegen
+      stats = await this.prisma.userZoneStats.create({
+        data: {
+          userId,
+          zoneId,
+          zoneKey: zone.zoneKey, // alt: Bot nutzt zoneKey
+          totalSecondsInZone: 0,
+          leftoverSeconds: 0,
+          pointsInThisZone: 0,
+          lastJoinTimestamp: new Date(),  // jetzt joined
+        },
+      });
+    } else {
+      // existiert => lastJoinTimestamp aktualisieren
+      // => user „joint“ erneut => evtl. war leftJoinTimestamp = null
+      await this.prisma.userZoneStats.update({
+        where: { id: stats.id },
+        data: {
+          lastJoinTimestamp: new Date(),
+        },
+      });
+    }
+  }
+
+  /**
+   * Wenn ein User den VoiceChannel verlässt
+   * => Zeitdifferenz = now - lastJoinTimestamp
+   * => leftoverSeconds + ...
+   * => Speichern in DB
+   */
+  async userLeftZone(params: {
+    userId: string;
+    zoneId: string;
+  }) {
+    const { userId, zoneId } = params;
+
+    // 1) Stats finden
+    const stats = await this.prisma.userZoneStats.findFirst({
+      where: { userId, zoneId },
+    });
+    if (!stats || !stats.lastJoinTimestamp) {
+      // Keine laufende Session => Nichts tun
+      return;
+    }
+
+    const now = new Date();
+    const deltaSeconds = Math.floor((now.getTime() - stats.lastJoinTimestamp.getTime()) / 1000);
+
+    // 2) Summieren
+    const updatedTotal = stats.totalSecondsInZone + deltaSeconds;
+    const updatedLeftover = stats.leftoverSeconds + deltaSeconds;
+
+    // => Vorläufig: Wir speichern leftoverSeconds, updaten totalSecondsInZone
+    await this.prisma.userZoneStats.update({
+      where: { id: stats.id },
+      data: {
+        totalSecondsInZone: updatedTotal,
+        leftoverSeconds: updatedLeftover,
+        pointsInThisZone: stats.pointsInThisZone,  // Noch kein Punktemechanismus
+        lastJoinTimestamp: null,                  // session beendet
+        lastUsage: now,
+      },
+    });
+  }
+}
+
+// apps/api/src/wizard/wizard.controller.ts
+
+
+import { Body, Controller, Get, Post, Patch, Param } from '@nestjs/common';
+import { WizardService } from './wizard.service';
+
+@Controller('wizard')
+export class WizardController {
+  constructor(private readonly wizardService: WizardService) {}
+
+  // (1) /wizard/start
+  @Post('start')
+  async startWizard(@Body() body: { userId: string; categoryId?: string }) {
+    return this.wizardService.startWizard(body.userId, body.categoryId);
+  }
+
+  // (2) /wizard/step => trackingActive
+  @Post('step')
+  async updateWizardStep(@Body() body: { userId: string; trackingActive?: boolean }) {
+    return this.wizardService.updateWizardSession(body);
+  }
+
+  // (3) /wizard/finish
+  @Patch('finish')
+  async finishWizard(@Body() body: { userId: string }) {
+    return this.wizardService.finishWizard(body.userId);
+  }
+
+  // (Optional) GET /wizard/:userId => Debug
+  @Get(':userId')
+  async getWizardSession(@Param('userId') userId: string) {
+    return this.wizardService.getWizardSessionByUser(userId);
+  }
+}
+
+// Pfad: apps/api/src/wizard/wizard.module.ts
+import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
+import { WizardController } from './wizard.controller';
+import { WizardService } from './wizard.service';
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [WizardController],
+  providers: [WizardService],
+  exports: [WizardService],
+})
+export class WizardModule {}
+
+// Pfad: apps/api/src/wizard/wizard.service.ts
+
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class WizardService {
+  constructor(private prisma: PrismaService) {}
+
+  // Start => legt WizardSession an
+  async startWizard(userId: string, categoryId?: string) {
+    return this.prisma.wizardSession.upsert({
+      where: { userId },
+      update: { categoryId: categoryId || null },
+      create: {
+        userId,
+        categoryId: categoryId || null,
+      },
+    });
+  }
+
+  // updateWizardSession => Set trackingActive + Upsert in userGlobalStats
+  async updateWizardSession(input: { userId: string; trackingActive?: boolean }) {
+    const { userId, trackingActive } = input;
+
+    // (A) WizardSession trackingActive
+    const updated = await this.prisma.wizardSession.update({
+      where: { userId },
+      data: { trackingActive },
+    });
+
+    // (B) Falls trackingActive vorhanden => userGlobalStats.isTracked
+    if (trackingActive !== undefined) {
+      await this.prisma.userGlobalStats.upsert({
+        where: { userId },
+        update: { isTracked: trackingActive },
+        create: { userId, isTracked: trackingActive },
+      });
+    }
+
+    return updated;
+  }
+
+  // finish => WizardSession löschen
+  async finishWizard(userId: string) {
+    await this.prisma.wizardSession.delete({ where: { userId } });
+    return { ok: true, message: `Wizard finished for user=${userId}` };
+  }
+
+  // Optional: Debug
+  async getWizardSessionByUser(userId: string) {
+    return this.prisma.wizardSession.findUnique({ where: { userId } });
+  }
+}
+
+
+
+// Pfad: apps/api/src/zones/services/zone-bulk-delete.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+import { VoiceChannelService } from '../voice-channel/voice-channel.service';
+
+@Injectable()
+export class ZoneBulkDeleteService {
+  private prisma = new PrismaClient();
+
+  constructor(private readonly voiceChannelService: VoiceChannelService) {}
+
+  async deleteManyZones(zoneIds: string[]) {
+    // 1) For each zone => remove voice channels
+    for (const zId of zoneIds) {
+      await this.voiceChannelService.deleteAllByZone(zId);
+    }
+
+    // 2) remove all zones
+    return this.prisma.zone.deleteMany({
+      where: { id: { in: zoneIds } },
+    });
+  }
+}
+
+
+// Pfad: apps/api/src/zones/services/zone-create.service.ts
+
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+import axios from 'axios';
+
+@Injectable()
+export class ZoneCreateService {
+  private prisma = new PrismaClient();
+
+  async createZone(data: {
+    zoneKey: string;
+    zoneName: string;
+    minutesRequired?: number;
+    pointsGranted?: number;
+    categoryId?: string | null;
+  }) {
+    // 1) Check Category
+    if (data.categoryId) {
+      const cat = await this.prisma.category.findUnique({
+        where: { id: data.categoryId },
+      });
+      if (!cat) {
+        throw new HttpException('Category does not exist', HttpStatus.BAD_REQUEST);
+      }
+
+      // If Category is in Setup Mode => skip Discord creation
+      if (cat.sendSetup) {
+        console.warn(`[ZoneCreateService] Category ${cat.id} is in Setup mode => skipping VoiceChannel creation.`);
+      }
+    }
+
+    // 2) DB => create new Zone
+    const newZone = await this.prisma.zone.create({
+      data: {
+        zoneKey: data.zoneKey,
+        zoneName: data.zoneName,
+        minutesRequired: data.minutesRequired ?? 60,
+        pointsGranted: data.pointsGranted ?? 1,
+        categoryId: data.categoryId || null,
+      },
+    });
+
+    // 3) Always create a VoiceChannel record in DB (discordChannelId = null)
+    const newVC = await this.prisma.voiceChannel.create({
+      data: {
+        zoneId: newZone.id,
+      },
+    });
+
+    // 4) If category exists AND sendSetup=false => create channel in Discord
+    if (data.categoryId) {
+      const cat = await this.prisma.category.findUnique({
+        where: { id: data.categoryId },
+      });
+      if (cat && !cat.sendSetup) {
+        // => create in Discord
+        const createdId = await this.createDiscordVoiceChannel(newZone, newVC.id);
+        if (createdId) {
+          // update DB => set discordChannelId
+          await this.prisma.voiceChannel.update({
+            where: { id: newVC.id },
+            data: { discordChannelId: createdId },
+          });
+        }
+      }
+    }
+
+    return newZone;
+  }
+
+  /**
+   * Helper function to create a VoiceChannel in Discord, returns the discordChannelId or null.
+   */
+  private async createDiscordVoiceChannel(zone: {
+    id: string;
+    zoneKey: string;
+    zoneName: string;
+    categoryId: string | null;
+  }, voiceChannelId: string): Promise<string | null> {
+    if (!zone.categoryId) return null;
+
+    const cat = await this.prisma.category.findUnique({
+      where: { id: zone.categoryId },
+    });
+    if (!cat?.discordCategoryId) return null;
+
+    const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+
+    try {
+      const resp = await axios.post(`${botUrl}/discord/voice-channels`, {
+        channelName: zone.zoneName,
+        categoryId: cat.discordCategoryId,
+      });
+      return resp.data.discordChannelId || null;
+    } catch (err) {
+      console.warn('[ZoneCreateService] createDiscordVoiceChannel -> Error:', err);
+      return null;
+    }
+  }
+}
+
+// Pfad: apps/api/src/zones/services/zone-delete.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+import { VoiceChannelService } from '../voice-channel/voice-channel.service';
+
+@Injectable()
+export class ZoneDeleteService {
+  private prisma = new PrismaClient();
+
+  constructor(
+    private readonly voiceChannelService: VoiceChannelService,
+  ) {}
+
+  async deleteZone(zoneId: string) {
+    // 1) remove VoiceChannels
+    await this.voiceChannelService.deleteAllByZone(zoneId);
+
+    // 2) remove Zone
+    return this.prisma.zone.delete({
+      where: { id: zoneId },
+    });
+  }
+}
+
+
+// Pfad: apps/api/src/zones/services/zone-find.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class ZoneFindService {
+  private prisma = new PrismaClient();
+
+  async findAll() {
+    // Aus deinem alten findAll() kopiert
+    return this.prisma.zone.findMany({
+      include: {
+        category: true,
+        voiceChannels: true,
+      },
+    });
+  }
+}
+
+// Pfad: apps/api/src/zones/services/zone-update.service.ts
+
+import { Injectable } from '@nestjs/common';
+import axios from 'axios';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class ZoneUpdateService {
+  private prisma = new PrismaClient();
+
+  async updateZone(zoneId: string, data: {
+    zoneKey?: string;
+    zoneName?: string;
+    minutesRequired?: number;
+    pointsGranted?: number;
+    categoryId?: string | null;
+  }) {
+    // 1) DB => update
+    const updatedZone = await this.prisma.zone.update({
+      where: { id: zoneId },
+      data: {
+        zoneKey: data.zoneKey,
+        zoneName: data.zoneName,
+        minutesRequired: data.minutesRequired,
+        pointsGranted: data.pointsGranted,
+        categoryId: data.categoryId,
+      },
+    });
+
+    // 2) find new category => get discordCategoryId
+    let newDiscordCategoryId: string | null = null;
+    if (updatedZone.categoryId) {
+      const newCat = await this.prisma.category.findUnique({
+        where: { id: updatedZone.categoryId },
+      });
+      newDiscordCategoryId = newCat?.discordCategoryId || null;
+    }
+
+    // 3) get VoiceChannels
+    const vcs = await this.prisma.voiceChannel.findMany({
+      where: { zoneId: updatedZone.id },
+    });
+
+    // 4) rename + re-parent in Discord
+    const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+    for (const vc of vcs) {
+      if (!vc.discordChannelId) continue;
+
+      const patchPayload: any = {
+        newName: updatedZone.zoneName,
+      };
+      if (newDiscordCategoryId) {
+        patchPayload.newCategoryId = newDiscordCategoryId;
+      }
+
+      try {
+        await axios.patch(`${botUrl}/discord/voice-channels/${vc.discordChannelId}`, patchPayload);
+      } catch (err) {
+        console.warn(`[ZoneUpdateService] Bot-Patch failed for VC=${vc.id}`, err);
+      }
+    }
+
+    return updatedZone;
+  }
+}
+
+// apps/api/src/zones/voice-channel/voice-channel.controller.ts
+
+import { Body, Controller, HttpException, HttpStatus, Patch, Param,Get, Query, BadRequestException } from '@nestjs/common';
+import { VoiceChannelService } from './voice-channel.service';
+
+
+@Controller('voice-channels') // <-- Achtung: Der Prefix /voice-channels
+export class VoiceChannelController {
+  constructor(private readonly voiceChannelService: VoiceChannelService) {}
+
+  /**
+   * PATCH /voice-channels/discord-deleted
+   * Body: { discordChannelId: string }
+   * => Kennzeichnet einen VoiceChannel als `deletedInDiscord = true`
+   */
+  @Patch('discord-deleted')
+  async markAsDeletedInDiscord(@Body() body: { discordChannelId: string }) {
+    if (!body.discordChannelId) {
+      throw new HttpException('Missing discordChannelId', HttpStatus.BAD_REQUEST);
+    }
+    return this.voiceChannelService.markAsDeletedInDiscord(body.discordChannelId);
+  }
+
+    /**
+   * PATCH /voice-channels/restore/:id
+   * => VoiceChannel in Discord neu anlegen + deletedInDiscord=false
+   */
+  @Patch('restore/:id')
+  async restoreInDiscord(@Param('id') vcId: string) {
+    if (!vcId) {
+      throw new HttpException('Missing voiceChannelId', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      const updated = await this.voiceChannelService.restoreVoiceChannelInDiscord(vcId);
+      return { ok: true, data: updated };
+    } catch (err) {
+      console.error('Fehler in restoreInDiscord:', err);
+      if (err instanceof HttpException) throw err;
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+    /**
+     * GET /voice-channels/lookup?discordChannelId=123
+     * => Liefert { zoneId: string | null }, damit der Bot weiß, wohin tracken.
+     */
+    @Get('lookup')
+    async lookupZoneId(@Query('discordChannelId') discordId: string) {
+      if (!discordId) {
+        throw new BadRequestException('missing discordChannelId');
+      }
+  
+      // => voiceChannelService => findByDiscordId
+      const vc = await this.voiceChannelService.findByDiscordId(discordId);
+      if (!vc) {
+        // existiert nicht
+        return { zoneId: null };
+      }
+      return { zoneId: vc.zoneId };
+    }
+}
+
+
+// apps/api/src/zones/voice-channel/voice-channel.service.ts
+
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+import axios from 'axios';
+
+/**
+ * Definiere ein eigenes Interface, 
+ * weil Prisma keinen Typ 'Zone' exportiert.
+ * Du brauchst eigentlich nur 2-3 Felder (id, zoneName, categoryId).
+ */
+export interface MinimalZone {
+  id: string;
+  zoneName: string;
+  categoryId?: string | null;
+}
+
+@Injectable()
+export class VoiceChannelService {
+  private prisma = new PrismaClient();
+
+  /**
+   * Erzeugt einen VoiceChannel-Datensatz in der DB 
+   * und legt einen Channel in Discord an.
+   */
+  async createInitialVoiceChannelForZone(zone: MinimalZone) {
+    // 1) VoiceChannel-Record in DB
+    const newVC = await this.prisma.voiceChannel.create({
+      data: { zoneId: zone.id },
+    });
+
+    // 2) Bot => Channel anlegen
+    try {
+      // Falls zone.categoryId leer => kein Discord Channel
+      if (!zone.categoryId) {
+        console.warn('[VoiceChannelService] Keine categoryId => kein Discord-Channel');
+        return newVC;
+      }
+
+      const cat = await this.prisma.category.findUnique({
+        where: { id: zone.categoryId },
+      });
+      const discordCategoryId = cat?.discordCategoryId || null;
+      if (!discordCategoryId) {
+        console.warn('[VoiceChannelService] Keine discordCategoryId => kein Discord-Channel');
+        return newVC;
+      }
+
+      const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+      const resp = await axios.post(`${botUrl}/discord/voice-channels`, {
+        channelName: zone.zoneName,
+        categoryId: discordCategoryId,
+      });
+      const { discordChannelId } = resp.data;
+      if (discordChannelId) {
+        // 3) DB => voiceChannel updaten
+        await this.prisma.voiceChannel.update({
+          where: { id: newVC.id },
+          data: { discordChannelId },
+        });
+      }
+
+      return newVC;
+    } catch (err) {
+      console.error('[VoiceChannelService] Bot-Fehler =>', err);
+      return newVC;
+    }
+  }
+    async findByDiscordId(discordChannelId: string) {
+        return this.prisma.voiceChannel.findUnique({
+          where: { discordChannelId },
+        });
+      }
+  /**
+   * Löscht alle VoiceChannels für eine Zone:
+   * 1) In Discord löschen
+   * 2) DB-Einträge entfernen
+   */
+  async deleteAllByZone(zoneId: string) {
+    const voiceChannels = await this.prisma.voiceChannel.findMany({
+      where: { zoneId },
+    });
+
+    for (const vc of voiceChannels) {
+      if (vc.discordChannelId) {
+        const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+        try {
+          await axios.delete(`${botUrl}/discord/voice-channels/${vc.discordChannelId}`);
+        } catch (err) {
+          console.warn(`[VoiceChannelService] Konnte VC in Discord nicht löschen: ${vc.discordChannelId}`, err);
+        }
+      }
+      // DB => remove
+      await this.prisma.voiceChannel.delete({ where: { id: vc.id } });
+    }
+
+    return voiceChannels.length;
+  }
+
+  /**
+   * Markiert einen VoiceChannel als 'deletedInDiscord = true',
+   * wenn der Bot meldet, dass der Kanal in Discord manuell gelöscht wurde.
+   */
+  async markAsDeletedInDiscord(discordChannelId: string) {
+    // 1) passender Datensatz
+    const vc = await this.prisma.voiceChannel.findUnique({
+      where: { discordChannelId },
+    });
+    if (!vc) {
+      throw new HttpException(
+        `VoiceChannel not found for discordChannelId=${discordChannelId}`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // 2) DB => updated
+    return this.prisma.voiceChannel.update({
+      where: { id: vc.id },
+      data: { deletedInDiscord: true },
+    });
+  }
+
+   /**
+    * Stellt einen VoiceChannel wieder her:
+    * 1) Prüfen, ob er wirklich deletedInDiscord = true
+    * 2) Neuen Kanal in Discord anlegen
+    * 3) DB => discordChannelId updaten + deletedInDiscord = false
+    */
+   async restoreVoiceChannelInDiscord(voiceChannelId: string) {
+     const vc = await this.prisma.voiceChannel.findUnique({
+       where: { id: voiceChannelId },
+     });
+     if (!vc) {
+       throw new HttpException(
+         `VoiceChannel not found for ID=${voiceChannelId}`,
+         HttpStatus.NOT_FOUND,
+       );
+     }
+     if (!vc.deletedInDiscord) {
+       throw new HttpException(
+         'VoiceChannel ist gar nicht als gelöscht markiert.',
+         HttpStatus.BAD_REQUEST,
+       );
+     }
+     // Falls zone fehlt => kein Channel
+     if (!vc.zoneId) {
+       throw new HttpException(
+         'VoiceChannel hat keine zoneId => kann nicht wiederhergestellt werden.',
+         HttpStatus.BAD_REQUEST,
+       );
+     }
+  
+     // (A) Zone laden => Name + categoryId
+     const zone = await this.prisma.zone.findUnique({
+       where: { id: vc.zoneId },
+     });
+     if (!zone) {
+       throw new HttpException(
+         `Zone not found for ID=${vc.zoneId}`,
+         HttpStatus.NOT_FOUND,
+       );
+     }
+  
+     // (B) Bot => Neuen VoiceChannel anlegen
+     //     (im Category-Workflow war es "axios.post(...)" => channelName, categoryId
+     try {
+       const cat = await this.prisma.category.findUnique({
+         where: { id: zone.categoryId || '' },
+       });
+       const discordCategoryId = cat?.discordCategoryId;
+       if (!discordCategoryId) {
+         throw new Error('Keine discordCategoryId gefunden => kann nicht wiederherstellen');
+       }
+  
+       const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+       const resp = await axios.post(`${botUrl}/discord/voice-channels`, {
+         channelName: zone.zoneName, // z.B. zoneName
+         categoryId: discordCategoryId,
+       });
+       const newDiscordChannelId = resp.data.discordChannelId;
+       if (!newDiscordChannelId) {
+         throw new Error('No discordChannelId returned from Bot');
+       }
+  
+       // (C) DB => voiceChannel aktualisieren => ID neu setzen, deletedInDiscord=false
+       const updated = await this.prisma.voiceChannel.update({
+         where: { id: vc.id },
+         data: {
+           discordChannelId: newDiscordChannelId,
+           deletedInDiscord: false,
+         },
+       });
+       return updated;
+     } catch (err) {
+       console.error('Bot-Fehler beim Wiederherstellen =>', err);
+       throw new HttpException(
+         'Bot konnte den VoiceChannel nicht neu anlegen.',
+         HttpStatus.BAD_GATEWAY,
+       );
+     }
+   }
+
+
+
+}
+
+
+// Pfad: apps/api/src/zones/zones.controller.ts
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+import { ZonesService } from './zones.service';
+
+@Controller('zones')
+export class ZonesController {
+  constructor(private readonly zonesService: ZonesService) {}
+
+  @Get()
+  async findAll() {
+    try {
+      return await this.zonesService.findAll();
+    } catch (err) {
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Post()
+  async create(@Body() body: {
+    zoneKey: string;
+    zoneName: string;
+    minutesRequired?: number;
+    pointsGranted?: number;
+    categoryId?: string;
+  }) {
+    if (!body.zoneKey || !body.zoneName) {
+      throw new HttpException('zoneKey & zoneName required', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      return await this.zonesService.createZone({
+        ...body,
+        categoryId: body.categoryId || null,
+      });
+    } catch (err) {
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id') zoneId: string,
+    @Body() body: {
+      zoneKey?: string;
+      zoneName?: string;
+      minutesRequired?: number;
+      pointsGranted?: number;
+      categoryId?: string;
+    },
+  ) {
+    if (!zoneId) {
+      throw new HttpException('Missing zoneId', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      return await this.zonesService.updateZone(zoneId, {
+        ...body,
+        categoryId: body.categoryId || null,
+      });
+    } catch (err) {
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') zoneId: string) {
+    if (!zoneId) {
+      throw new HttpException('Missing zoneId', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      return await this.zonesService.deleteZone(zoneId);
+    } catch (err) {
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Post('bulk-delete')
+  async bulkDelete(@Body() body: { zoneIds: string[] }) {
+    try {
+      if (!body.zoneIds || body.zoneIds.length === 0) {
+        throw new HttpException('No IDs given', HttpStatus.BAD_REQUEST);
+      }
+      const result = await this.zonesService.deleteManyZones(body.zoneIds);
+      return { deletedCount: result.count };
+    } catch (err) {
+      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+}
+
+
+// Pfad: apps/api/src/zones/zones.module.ts
+import { Module } from '@nestjs/common';
+import { ZonesController } from './zones.controller';
+import { ZonesService } from './zones.service';
+
+// Sub-Services:
+import { ZoneCreateService } from './services/zone-create.service';
+import { ZoneUpdateService } from './services/zone-update.service';
+import { ZoneDeleteService } from './services/zone-delete.service';
+import { ZoneBulkDeleteService } from './services/zone-bulk-delete.service';
+import { ZoneFindService } from './services/zone-find.service';
+
+import { VoiceChannelService } from './voice-channel/voice-channel.service';
+import { VoiceChannelController } from './voice-channel/voice-channel.controller';
+
+@Module({
+  controllers: [
+    ZonesController,       // dein Zonen-Controller
+    VoiceChannelController // dein VoiceChannel-Controller
+  ],
+  providers: [
+    ZonesService,          // Haupt-Service (Orchestrierung)
+    VoiceChannelService,   // VoiceChannelService bleibt
+    ZoneFindService,
+    ZoneCreateService,
+    ZoneUpdateService,
+    ZoneDeleteService,
+    ZoneBulkDeleteService
+  ],
+})
+export class ZonesModule {}
+
+// Pfad: apps/api/src/zones/zones.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { ZoneFindService } from './services/zone-find.service';
+import { ZoneCreateService } from './services/zone-create.service';
+import { ZoneUpdateService } from './services/zone-update.service';
+import { ZoneDeleteService } from './services/zone-delete.service';
+import { ZoneBulkDeleteService } from './services/zone-bulk-delete.service';
+
+@Injectable()
+export class ZonesService {
+  constructor(
+    private readonly zoneFindService: ZoneFindService,
+    private readonly zoneCreateService: ZoneCreateService,
+    private readonly zoneUpdateService: ZoneUpdateService,
+    private readonly zoneDeleteService: ZoneDeleteService,
+    private readonly zoneBulkDeleteService: ZoneBulkDeleteService,
+  ) {}
+
+  // 1) READ ALL
+  findAll() {
+    return this.zoneFindService.findAll();
+  }
+
+  // 2) CREATE
+  createZone(data: {
+    zoneKey: string;
+    zoneName: string;
+    minutesRequired?: number;
+    pointsGranted?: number;
+    categoryId?: string | null;
+  }) {
+    return this.zoneCreateService.createZone(data);
+  }
+
+  // 3) UPDATE
+  updateZone(zoneId: string, data: {
+    zoneKey?: string;
+    zoneName?: string;
+    minutesRequired?: number;
+    pointsGranted?: number;
+    categoryId?: string | null;
+  }) {
+    return this.zoneUpdateService.updateZone(zoneId, data);
+  }
+
+  // 4) DELETE
+  deleteZone(zoneId: string) {
+    return this.zoneDeleteService.deleteZone(zoneId);
+  }
+
+  // 5) BULK DELETE
+  deleteManyZones(zoneIds: string[]) {
+    return this.zoneBulkDeleteService.deleteManyZones(zoneIds);
+  }
+}
+
+
+import { Controller, Get } from '@nestjs/common';
+import { AppService } from './app.service';
+
+@Controller()
+export class AppController {
+  constructor(private readonly appService: AppService) {}
+
+  @Get()
+  getHello(): string {
+    return this.appService.getHello();
+  }
+}
+
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { CategoriesModule } from './categories/categories.module';
+import { ZonesModule } from './zones/zones.module';
+import { RolesModule } from './roles/roles.module';
+import { TrackingModule } from './tracking/tracking.module';
+import { SetupModule } from './setup/setup.module'; // <-- Hier importieren
+
+
+@Module({
+  imports: [CategoriesModule, ZonesModule, RolesModule, TrackingModule, CategoriesModule,
+    SetupModule,],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class AppService {
+  getHello(): string {
+    return 'Hello World!';
+  }
+}
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+// 1) dotenv
+import * as dotenv from 'dotenv';
+import * as dotenvExpand from 'dotenv-expand';
+const env = dotenv.config(); // Laden
+dotenvExpand.expand(env); // Expand
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // 1) CORS einschalten:
+  app.enableCors({
+    origin: '*', // oder eine bestimmte Liste z.B. ["http://localhost:3000"]
+  });
+
+  await app.listen(3004);
+}
+bootstrap();
+
+
+Dashboard (Ausschnitte) next.js/react
+
+// apps/dashboard/src/app/dashboard/categories/page.tsx
+
+import type { Metadata } from "next";
+import { prisma } from "@/lib/prisma";
+import { CategoriesView } from "@/components/dashboard/categories/categories-view";
+import type { CategoryItem } from "@/components/dashboard/categories/types";
+
+export const metadata: Metadata = {
+  title: "Categories | Dashboard",
+};
+
+// Hilfsfunktion: KEIN default export
+async function loadAllCategories(): Promise<CategoryItem[]> {
+  // Hier der "select" => so weiß TS, dass 'deletedInDiscord' existiert
+  const dbCats = await prisma.category.findMany({
+    select: {
+      id: true,
+      name: true,
+      deletedInDiscord: true, 
+      // ... sonstige Felder
+    },
+  });
+
+  // Mapping => CategoryItem
+  return dbCats.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    deletedInDiscord: cat.deletedInDiscord ?? false,
+    // z. B. ...
+    // createdAt: cat.createdAt,
+    // lastUsedAt: cat.lastUsage ?? null,
+  }));
+}
+
+// "default export" => Next.js Page
+export default async function Page() {
+  const categories = await loadAllCategories();
+  return <CategoriesView categories={categories} />;
+}
+
+// apps/dashboard/src/app/dashboard/categories/zones/create/page.tsx
+import type { Metadata } from "next";
+import Link from "next/link";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { ArrowLeft as ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
+
+import { appConfig } from "@/config/app";
+import { ZoneCreateForm } from "@/components/dashboard/categories/zones/zone-create-form";
+
+// Optional: Falls du ein Pfad-Objekt hast
+// import { paths } from "@/paths";
+
+export const metadata: Metadata = {
+	title: `Create | Zones | Dashboard | ${appConfig.name}`,
+};
+
+export default function Page() {
+	return (
+		<Box
+			sx={{
+				// EXAKT wie dein originales Layout:
+				maxWidth: "var(--Content-maxWidth)",
+				m: "var(--Content-margin)",
+				p: "var(--Content-padding)",
+				width: "var(--Content-width)",
+			}}
+		>
+			<Stack spacing={4}>
+				{/* Kopfzeile */}
+				<Stack spacing={3}>
+					<div>
+						<Button
+							component={Link}
+							href="/dashboard/categories"
+							startIcon={<ArrowLeftIcon />}
+							color="inherit"
+							sx={{ gap: 1 }}
+						>
+							Zones
+						</Button>
+					</div>
+					<div>
+						<Typography variant="h4">Zone Erstellen</Typography>
+					</div>
+				</Stack>
+
+				{/* Client-Form */}
+				<ZoneCreateForm />
+			</Stack>
+		</Box>
+	);
+}
+
+
+
+// apps/dashboard/src/app/dashboard/categories/zones/edit/[zoneId]/page.tsx
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { ArrowLeft as ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
+
+import { prisma } from "@/lib/prisma"; // anpassen, wo du Prisma importierst
+import { ZoneEditForm } from "@/components/dashboard/categories/zones/zone-edit-form";
+
+export const metadata: Metadata = {
+	title: "Zone bearbeiten",
+};
+
+// SSR-Fetch einer Zone + categoryId etc.
+async function fetchZoneFromDB(zoneId: string) {
+	// Optional: Du könntest include: { category: true } machen
+	// Wir brauchen aber nur categoryId (reicht "findUnique"?), also:
+	const zone = await prisma.zone.findUnique({
+		where: { id: zoneId },
+	});
+	return zone;
+}
+
+interface PageProps {
+	params: { zoneId: string };
+}
+
+export default async function Page({ params }: PageProps) {
+	const { zoneId } = params;
+	const zone = await fetchZoneFromDB(zoneId);
+
+	if (!zone) {
+		notFound();
+	}
+
+	return (
+		<Box
+			sx={{
+				maxWidth: "var(--Content-maxWidth)",
+				m: "var(--Content-margin)",
+				p: "var(--Content-padding)",
+				width: "var(--Content-width)",
+			}}
+		>
+			<Stack spacing={4}>
+				<Stack spacing={3}>
+					<div>
+						<Button
+							component={Link}
+							href="/dashboard/categories"
+							startIcon={<ArrowLeftIcon />}
+							color="inherit"
+							sx={{ gap: 1 }}
+						>
+							Zonen
+						</Button>
+					</div>
+					<div>
+						<Typography variant="h4">Zone bearbeiten</Typography>
+					</div>
+				</Stack>
+
+				{/* Client-Form => mit categoryId */}
+				<ZoneEditForm
+					zone={{
+						id: zone.id,
+						zoneKey: zone.zoneKey,
+						zoneName: zone.zoneName,
+						minutesRequired: zone.minutesRequired,
+						pointsGranted: zone.pointsGranted,
+						// WICHTIG: hier übergeben wir zone.categoryId
+						categoryId: zone.categoryId,
+					}}
+				/>
+			</Stack>
+		</Box>
+	);
+}
+
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { ArrowLeft as ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
+
+import { prisma } from "@/lib/prisma"; // PFAD anpassen
+import { CategoryEditForm } from "@/components/dashboard/categories/category-edit-form/category-edit-form";
+
+export const metadata: Metadata = {
+	title: "Kategorie bearbeiten",
+};
+
+async function fetchCategoryFromDB(categoryId: string) {
+	const cat = await prisma.category.findUnique({ where: { id: categoryId } });
+	return cat; // oder null
+}
+
+interface PageProps {
+	params: { categoryId: string };
+}
+
+// Server-Component
+export default async function Page({ params }: PageProps) {
+	const { categoryId } = params;
+
+	// Hol echte Daten
+	const category = await fetchCategoryFromDB(categoryId);
+	if (!category) {
+		notFound(); // zeigt 404
+	}
+
+	// CategoryEditForm braucht: { id, name, categoryType, tags: string[], isVisible: boolean }
+	// In DB hast du "allowedRoles", wir mappen es auf "tags"
+	return (
+		<Box
+			sx={{
+				maxWidth: "var(--Content-maxWidth)",
+				m: "var(--Content-margin)",
+				p: "var(--Content-padding)",
+				width: "var(--Content-width)",
+			}}
+		>
+			<Stack spacing={4}>
+				<Stack spacing={3}>
+					<div>
+						<Button
+							component={Link}
+							href="/dashboard/categories"
+							startIcon={<ArrowLeftIcon />}
+							color="inherit"
+							sx={{ gap: 1 }}
+						>
+							Kategorien
+						</Button>
+					</div>
+					<div>
+						<Typography variant="h4">Kategorie bearbeiten</Typography>
+					</div>
+				</Stack>
+
+				{/* Client-Form: Edit */}
+				<CategoryEditForm
+					category={{
+						id: category.id,
+						name: category.name,
+						categoryType: category.categoryType,
+						tags: category.allowedRoles ?? [],
+						isVisible: category.isVisible,
+					}}
+				/>
+			</Stack>
+		</Box>
+	);
+}
+
+import type * as React from "react";
+import type { Metadata } from "next";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+
+import { appConfig } from "@/config/app";
+import { CategoryWizard } from "@/components/dashboard/categories/create-wizard/CategoryWizard";
+
+export const metadata = {
+	title: `Create | Category | Dashboard | ${appConfig.name}`,
+} satisfies Metadata;
+
+/**
+ * Page-Route für `/dashboard/categories/create`
+ * Zeigt links ein (Dummy) Bild, rechts den Wizard.
+ */
+export default function Page(): React.JSX.Element {
+	return (
+		<Box sx={{ display: "flex", flex: "1 1 0", minHeight: 0 }}>
+			{/* Linkes Bild (Dummy) */}
+			<Box
+				sx={{
+					position: "relative",
+					overflow: "hidden",
+					backgroundImage: "url(/assets/people-talking.png)",
+					backgroundPosition: "center",
+					backgroundSize: "cover",
+					flex: "0 0 auto",
+					display: { xs: "none", md: "block" },
+					width: { md: "400px", xl: "500px" },
+				}}
+			/>
+
+			{/* Rechts der Wizard */}
+			<Box sx={{ flex: "1 1 auto", overflowY: "auto", p: { xs: 4, sm: 6, md: 8 } }}>
+				<Stack maxWidth="md" spacing={4}>
+					<Typography variant="h4">Neue Kategorie Erstellen</Typography>
+					<CategoryWizard />
+				</Stack>
+			</Box>
+		</Box>
+	);
+}
+
+// apps/dashboard/src/components/dashboard/categories/types.ts
+
+export interface CategoryItem {
+	id: string;
+	name: string;
+	createdAt?: Date;
+	lastUsedAt?: Date | null;
+	deletedInDiscord?: boolean;
+}
+
+// apps/dashboard/src/components/dashboard/categories/sidebar.tsx
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Divider from "@mui/material/Divider";
+import Drawer from "@mui/material/Drawer";
+import IconButton from "@mui/material/IconButton";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { Plus as PlusIcon } from "@phosphor-icons/react/dist/ssr/Plus";
+import { X as XIcon } from "@phosphor-icons/react/dist/ssr/X";
+
+import { useMediaQuery } from "@/hooks/use-media-query";
+
+import { SidebarList } from "./sidebar-list";
+import type { CategoryItem } from "./types";
+
+interface SidebarProps {
+	categories: CategoryItem[];
+	selectedCatId: string | null;
+	onSelectCategory: (catId: string | null) => void; // <-- NEU
+	open: boolean;
+	onClose: () => void;
+}
+
+export function Sidebar({ categories, selectedCatId, onSelectCategory, open, onClose }: SidebarProps) {
+	const mdUp = useMediaQuery("up", "md");
+
+	const content = (
+		<SidebarContent
+			categories={categories}
+			selectedCatId={selectedCatId}
+			onSelectCategory={onSelectCategory}
+			onClose={onClose}
+		/>
+	);
+
+	if (mdUp) {
+		return (
+			<Box
+				sx={{
+					borderRight: "1px solid var(--mui-palette-divider)",
+					display: { xs: "none", md: "block" },
+					flex: "0 0 auto",
+					width: 320,
+				}}
+			>
+				{content}
+			</Box>
+		);
+	}
+
+	return (
+		<Drawer PaperProps={{ sx: { width: 320 } }} open={open} onClose={onClose} variant="temporary">
+			{content}
+		</Drawer>
+	);
+}
+
+interface SidebarContentProps {
+	categories: CategoryItem[];
+	selectedCatId: string | null;
+	onSelectCategory: (catId: string | null) => void;
+	onClose: () => void;
+}
+
+function SidebarContent({ categories, selectedCatId, onSelectCategory, onClose }: SidebarContentProps) {
+	return (
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+			{/* Kopf */}
+			<Stack spacing={1} sx={{ p: 2 }}>
+				<Stack direction="row" alignItems="center" justifyContent="space-between">
+					<Typography variant="h5">Categories</Typography>
+					<IconButton onClick={onClose} sx={{ display: { md: "none" } }}>
+						<XIcon />
+					</IconButton>
+				</Stack>
+				<Button component={Link} href="/dashboard/categories/create" variant="contained" startIcon={<PlusIcon />}>
+					Add Category
+				</Button>
+			</Stack>
+			<Divider />
+			{/* Liste */}
+			<Box sx={{ flex: 1, overflowY: "auto" }}>
+				<SidebarList categories={categories} selectedCatId={selectedCatId} onSelectCategory={onSelectCategory} />
+			</Box>
+		</Box>
+	);
+}
+
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+// NEU: MUI-FAB & Icon "RestoreFromTrash"
+import Fab from "@mui/material/Fab";
+import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
+
+import { Box, Collapse, Divider, IconButton, Stack, Typography } from "@mui/material";
+import { NotePencil as NotePencilIcon } from "@phosphor-icons/react/dist/ssr/NotePencil";
+
+import { restoreCategory } from "@/services/categories";
+import type { CategoryItem } from "./types";
+
+/** --------------------------
+ * PROPS
+ * -------------------------- */
+interface SidebarListProps {
+  categories: CategoryItem[];
+  selectedCatId: string | null;
+  onSelectCategory: (catId: string | null) => void;
+}
+
+/** --------------------------
+ * SIDEBAR LIST
+ * -------------------------- */
+export function SidebarList({ categories, selectedCatId, onSelectCategory }: SidebarListProps) {
+  return (
+    <Box sx={{ py: 1 }}>
+      {categories.map((cat) => {
+        const isSelected = cat.id === selectedCatId;
+
+        const handleToggle = () => {
+          if (isSelected) {
+            onSelectCategory(null);
+          } else {
+            onSelectCategory(cat.id);
+          }
+        };
+
+        return (
+          <SidebarListItem
+            key={cat.id}
+            category={cat}
+            selected={isSelected}
+            onToggle={handleToggle}
+          />
+        );
+      })}
+    </Box>
+  );
+}
+
+/** --------------------------
+ * EIN EINZELNES ITEM
+ * -------------------------- */
+interface SidebarListItemProps {
+  category: CategoryItem;
+  selected: boolean;
+  onToggle: () => void;
+}
+
+function SidebarListItem({ category, selected, onToggle }: SidebarListItemProps) {
+  const isDeletedInDiscord = category.deletedInDiscord === true;
+
+  // (NEU) Handler: Wiederherstellen
+  const handleRestore = React.useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation(); // Kein Toggle
+
+      const confirmed = window.confirm("Wirklich wiederherstellen?");
+      if (!confirmed) return;
+
+      try {
+        await restoreCategory(category.id);
+        // Erfolg => Optional: Reload page or refresh data
+        alert("Kategorie wurde wiederhergestellt!");
+        window.location.reload();
+      } catch (error) {
+        console.error("handleRestore error:", error);
+        alert("Unerwarteter Fehler beim Wiederherstellen: " + String(error));
+      }
+    },
+    [category.id]
+  );
+
+  return (
+    <Box
+      sx={{
+        backgroundColor: isDeletedInDiscord ? "rgba(255, 0, 0, 0.08)" : "inherit",
+        "&:hover": {
+          backgroundColor: isDeletedInDiscord ? "rgba(255, 0, 0, 0.12)" : "transparent",
+        },
+      }}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          px: 2,
+          py: 1,
+          borderBottom: "1px solid var(--mui-palette-divider)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+        }}
+        onClick={onToggle}
+      >
+        {/* Left */}
+        <Box>
+          <Typography variant="body1" sx={{ fontWeight: 500 }}>
+            {category.name}
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {category.lastUsedAt ? `Last used: ${category.lastUsedAt.toLocaleTimeString()}` : "No usage"}
+          </Typography>
+
+          {isDeletedInDiscord && (
+            <>
+              <Typography variant="caption" sx={{ color: "error.main", display: "block", fontWeight: "bold" }}>
+                Gelöscht im Discord
+              </Typography>
+              {/* NEU: "Wiederherstellen"-FAB */}
+              <Fab
+              variant="extended"
+              size="small"
+              color="success"
+                onClick={handleRestore}
+                sx={{
+                  textTransform: "none",
+                  mt: 1,
+                  "&:hover": {
+
+                  },
+                }}
+              >
+                <RestoreFromTrashIcon sx={{ mr: 1 }} />
+                Wiederherstellen
+              </Fab>
+            </>
+          )}
+        </Box>
+
+        {/* Right */}
+        <IconButton
+          component={Link}
+          href={`/dashboard/categories/edit/${category.id}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <NotePencilIcon />
+        </IconButton>
+      </Box>
+
+      {/* Detail-Collapse */}
+      <Collapse in={selected} unmountOnExit>
+        <Box sx={{ px: 2, py: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+            Temperature (good)
+          </Typography>
+          <Typography variant="body2">6°C</Typography>
+
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Timeline
+            </Typography>
+            <Stack spacing={1} sx={{ mt: 1 }}>
+              <EventLine label="Arrived" time="Jan 22, 2025 8:57 PM" />
+              <EventLine label="Out for delivery" time="Jan 22, 2025 8:32 PM" />
+              <EventLine label="Tracking number created" time="Jan 22, 2025 6:45 PM" />
+            </Stack>
+          </Box>
+        </Box>
+        <Divider />
+      </Collapse>
+    </Box>
+  );
+}
+
+/** Timeline-Helfer */
+function EventLine({ label, time }: { label: string; time: string }) {
+  return (
+    <Stack spacing={0.5}>
+      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+        {label}
+      </Typography>
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        {time}
+      </Typography>
+    </Stack>
+  );
+}
+
+// apps/dashboard/src/components/dashboard/categories/categories-view.tsx
+"use client";
+
+import * as React from "react";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import Stack from "@mui/material/Stack";
+import { DotsThree as DotsThreeIcon } from "@phosphor-icons/react/dist/ssr/DotsThree";
+import { List as ListIcon } from "@phosphor-icons/react/dist/ssr/List";
+
+import { Sidebar } from "./sidebar";
+import type { CategoryItem } from "./types";
+import { ZonesPageClient } from "./zones/zones-page-client";
+
+export interface CategoriesViewProps {
+	categories: CategoryItem[];
+}
+
+export function CategoriesView({ categories }: CategoriesViewProps) {
+	const [openSidebar, setOpenSidebar] = React.useState<boolean>(false);
+	const [selectedCatId, setSelectedCatId] = React.useState<string | null>(null);
+
+	// Drawer
+	const handleSidebarOpen = React.useCallback(() => {
+		setOpenSidebar(true);
+	}, []);
+	const handleSidebarClose = React.useCallback(() => {
+		setOpenSidebar(false);
+	}, []);
+
+	// Klick auf Kategorie => Toggle
+	const handleCategorySelect = React.useCallback((catId: string | null) => {
+		setSelectedCatId(catId);
+	}, []);
+
+	const selectedCategory = selectedCatId
+    ? categories.find((c) => c.id === selectedCatId)
+    : null;
+
+	return (
+		<Box sx={{ display: "flex", flex: "1 1 0", minHeight: 0 }}>
+			{/* Linke Sidebar */}
+			<Sidebar
+				categories={categories}
+				selectedCatId={selectedCatId}
+				onSelectCategory={handleCategorySelect}
+				open={openSidebar}
+				onClose={handleSidebarClose}
+			/>
+
+			{/* Hauptbereich rechts */}
+			<Box
+				sx={{
+					display: "flex",
+					flex: "1 1 auto",
+					flexDirection: "column",
+					overflow: "hidden",
+				}}
+			>
+				{/* Kopfzeile */}
+				<Box
+					sx={{
+						borderBottom: "1px solid var(--mui-palette-divider)",
+						display: "flex",
+						flex: "0 0 auto",
+						p: 2,
+					}}
+				>
+					<Stack direction="row" spacing={1} sx={{ flex: "1 1 auto" }}>
+						<IconButton onClick={handleSidebarOpen} sx={{ display: { md: "none" } }}>
+							<ListIcon />
+						</IconButton>
+					</Stack>
+					<Stack direction="row" spacing={1}>
+						<IconButton>
+							<DotsThreeIcon weight="bold" />
+						</IconButton>
+					</Stack>
+				</Box>
+
+				{/* NEU: Hier kommt die "Zonen"-Tabelle */}
+				<Box sx={{ flex: "1 1 auto", p: 3 }}>
+					<ZonesPageClient />
+				</Box>
+			</Box>
+		</Box>
+	);
+}
+
+// apps/dashboard/src/components/dashboard/categories/zones/types.ts
+
+/** Der Haupt-Typ, den unsere Tabelle anzeigt */
+export interface ZoneResult {
+	id: string;
+	zoneKey: string;
+	zoneName: string;
+	minutesRequired: number;
+	pointsGranted: number;
+	totalSecondsInZone: number;
+	categoryName: string | null;
+	lastUsage: Date | null;
+	categoryDeletedInDiscord?: boolean;
+	voiceChannelId?: string | null;              
+  	voiceChannelDeletedInDiscord?: boolean;      
+}
+
+
+// apps/Dashboard/src/components/dashboard/categories/zones/zone-create-form.tsx
+"use client";
+
+import * as React from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getCategories } from "@/services/categories"; // Pfad ggf. anpassen
+import { createZone } from "@/services/zones";
+import Button from "@mui/material/Button";
+import MenuItem from "@mui/material/MenuItem";
+import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
+
+interface CategoryOption {
+	id: string;
+	name: string;
+}
+
+export function ZoneCreateForm() {
+	const router = useRouter();
+
+	// 1) Kategorieliste laden
+	const [categories, setCategories] = useState<CategoryOption[]>([]);
+	const [categoryId, setCategoryId] = useState("");
+
+	// 2) Pflichtfelder
+	const [zoneKey, setZoneKey] = useState("");
+	const [zoneName, setZoneName] = useState("");
+	const [minutesRequired, setMinutesRequired] = useState<number>(60);
+	const [pointsGranted, setPointsGranted] = useState<number>(1);
+
+	// Fehlerzustände
+	const [errorCategory, setErrorCategory] = useState("");
+	const [errorZoneKey, setErrorZoneKey] = useState("");
+	const [errorZoneName, setErrorZoneName] = useState("");
+	const [errorMinutes, setErrorMinutes] = useState("");
+	const [errorPoints, setErrorPoints] = useState("");
+
+	// 3) Beim Mount => Kategorien von NestJS holen (z. B. http://localhost:3004/categories)
+	useEffect(() => {
+		async function loadCategories() {
+			try {
+				const data = await getCategories();
+				const mapped = data.map((cat: any) => ({ id: cat.id, name: cat.name }));
+				setCategories(mapped);
+			} catch (err) {
+				console.error("loadCategories error:", err);
+			}
+		}
+		loadCategories();
+	}, []);
+
+	// 4) Speichern + Validierung
+	const handleSave = useCallback(async () => {
+		// Reset
+		setErrorCategory("");
+		setErrorZoneKey("");
+		setErrorZoneName("");
+		setErrorMinutes("");
+		setErrorPoints("");
+
+		let isValid = true;
+
+		if (!categoryId) {
+			setErrorCategory("Bitte eine Kategorie auswählen");
+			isValid = false;
+		}
+		if (!zoneKey.trim()) {
+			setErrorZoneKey("Zone Key ist erforderlich");
+			isValid = false;
+		}
+		if (!zoneName.trim()) {
+			setErrorZoneName("Zonen-Name ist erforderlich");
+			isValid = false;
+		}
+		if (minutesRequired <= 0) {
+			setErrorMinutes("Minuten > 0 erforderlich");
+			isValid = false;
+		}
+		if (pointsGranted <= 0) {
+			setErrorPoints("Punkte > 0 erforderlich");
+			isValid = false;
+		}
+
+		if (!isValid) return;
+
+		// POST zur NestJS-API
+		try {
+			await createZone({ categoryId, zoneKey, zoneName, minutesRequired, pointsGranted });
+			// Erfolg => zurück zur Liste
+			router.push("/dashboard/categories");
+		} catch (error) {
+			console.error("handleSave error:", error);
+			alert(`Unerwarteter Fehler: ${String(error)}`);
+		}
+	}, [categoryId, zoneKey, zoneName, minutesRequired, pointsGranted, router]);
+
+	return (
+		<Stack spacing={2}>
+			{/* Kategorie-Dropdown */}
+			<TextField
+				select
+				required
+				label="Kategorie"
+				value={categoryId}
+				onChange={(e) => setCategoryId(e.target.value)}
+				helperText={errorCategory || "Wähle eine Kategorie (Pflichtfeld)"}
+				error={!!errorCategory}
+			>
+				<MenuItem value="">
+					<em>Keine Auswahl</em>
+				</MenuItem>
+				{categories.map((cat) => (
+					<MenuItem key={cat.id} value={cat.id}>
+						{cat.name}
+					</MenuItem>
+				))}
+			</TextField>
+
+			<TextField
+				required
+				label="Zone Key"
+				value={zoneKey}
+				onChange={(e) => setZoneKey(e.target.value)}
+				error={!!errorZoneKey}
+				helperText={errorZoneKey}
+			/>
+			<TextField
+				required
+				label="Zone Name"
+				value={zoneName}
+				onChange={(e) => setZoneName(e.target.value)}
+				error={!!errorZoneName}
+				helperText={errorZoneName}
+			/>
+			<TextField
+				required
+				label="Benötigte Minuten"
+				type="number"
+				value={minutesRequired}
+				onChange={(e) => setMinutesRequired(Number(e.target.value))}
+				error={!!errorMinutes}
+				helperText={errorMinutes}
+			/>
+			<TextField
+				required
+				label="Punkte"
+				type="number"
+				value={pointsGranted}
+				onChange={(e) => setPointsGranted(Number(e.target.value))}
+				error={!!errorPoints}
+				helperText={errorPoints}
+			/>
+
+			<Button variant="contained" onClick={handleSave}>
+				Speichern
+			</Button>
+		</Stack>
+	);
+}
+
+
+// apps/Dashboard/src/components/dashboard/categories/zones/zone-edit-form.tsx
+"use client";
+
+import * as React from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getCategories } from "@/services/categories";
+import { deleteZone, updateZone } from "@/services/zones";
+import Button from "@mui/material/Button";
+import MenuItem from "@mui/material/MenuItem";
+import Stack from "@mui/material/Stack";
+import TextField from "@mui/material/TextField";
+
+interface ZoneData {
+	id: string;
+	zoneKey: string;
+	zoneName: string;
+	minutesRequired: number;
+	pointsGranted: number;
+	categoryId?: string | null;
+}
+
+interface CategoryOption {
+	id: string;
+	name: string;
+}
+
+export function ZoneEditForm({ zone }: { zone: ZoneData }) {
+	const router = useRouter();
+
+	// Kategorien-States
+	const [categories, setCategories] = useState<CategoryOption[]>([]);
+	const [categoryId, setCategoryId] = useState(zone.categoryId ?? "");
+
+	// Restliche States
+	const [zoneKey, setZoneKey] = useState(zone.zoneKey);
+	const [zoneName, setZoneName] = useState(zone.zoneName);
+	const [minutesRequired, setMinutesRequired] = useState(zone.minutesRequired);
+	const [pointsGranted, setPointsGranted] = useState(zone.pointsGranted);
+
+	// 1) Kategorien laden (von NestJS)
+	useEffect(() => {
+		async function loadCategories() {
+			try {
+				const data = await getCategories();
+				const mapped = data.map((cat: any) => ({
+					id: cat.id,
+					name: cat.name,
+				}));
+				setCategories(mapped);
+			} catch (err) {
+				console.error("loadCategories error:", err);
+			}
+		}
+		loadCategories();
+	}, []);
+
+	// 2) Speichern => PATCH /zones/:id (NestJS)
+	const handleSave = useCallback(async () => {
+		try {
+			await updateZone(zone.id, { zoneKey, zoneName, minutesRequired, pointsGranted, categoryId });
+
+			router.push("/dashboard/categories");
+		} catch (error) {
+			console.error("handleSave error:", error);
+			alert("Unerwarteter Fehler beim Update: " + String(error));
+		}
+	}, [zone.id, zoneKey, zoneName, minutesRequired, pointsGranted, categoryId, router]);
+
+	// 3) Löschen => DELETE /zones/:id (NestJS)
+	const handleDelete = useCallback(async () => {
+		const confirmed = window.confirm("Wirklich löschen?");
+		if (!confirmed) return;
+
+		try {
+			await deleteZone(zone.id);
+			router.push("/dashboard/categories");
+		} catch (error) {
+			console.error("handleDelete error:", error);
+			alert("Unerwarteter Fehler beim Löschen: " + String(error));
+		}
+	}, [zone.id, router]);
+
+	return (
+		<Stack spacing={2}>
+			{/* Kategorie-Dropdown */}
+			<TextField
+				select
+				label="Kategorie"
+				value={categoryId}
+				onChange={(e) => setCategoryId(e.target.value)}
+				helperText="Wähle die Kategorie, in der diese Zone liegt"
+			>
+				<MenuItem value="">
+					<em>Keine Kategorie</em>
+				</MenuItem>
+				{categories.map((cat) => (
+					<MenuItem key={cat.id} value={cat.id}>
+						{cat.name}
+					</MenuItem>
+				))}
+			</TextField>
+
+			<TextField label="Zone Key" value={zoneKey} onChange={(e) => setZoneKey(e.target.value)} />
+			<TextField label="Zone Name" value={zoneName} onChange={(e) => setZoneName(e.target.value)} />
+			<TextField
+				label="Benötigte Minuten"
+				type="number"
+				value={minutesRequired}
+				onChange={(e) => setMinutesRequired(Number(e.target.value))}
+			/>
+			<TextField
+				label="Punkte"
+				type="number"
+				value={pointsGranted}
+				onChange={(e) => setPointsGranted(Number(e.target.value))}
+			/>
+
+			{/* Footer-Buttons: Löschen/Speichern */}
+			<Stack direction="row" spacing={2} justifyContent="flex-end">
+				<Button color="error" variant="outlined" onClick={handleDelete}>
+					Löschen
+				</Button>
+				<Button variant="contained" onClick={handleSave}>
+					Änderungen Speichern
+				</Button>
+			</Stack>
+		</Stack>
+	);
+}
+
+"use client";
+
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { bulkDeleteZones } from "@/services/zones";
+import Button from "@mui/material/Button";
+import Divider from "@mui/material/Divider";
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
+import OutlinedInput from "@mui/material/OutlinedInput";
+import Select, { SelectChangeEvent } from "@mui/material/Select";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+
+import { useZonesSelection } from "./zones-selection-context";
+
+export interface Filters {
+	zoneKey?: string;
+	name?: string;
+}
+export type SortDir = "asc" | "desc";
+
+export interface ZonesFiltersProps {
+	filters: Filters; // z. B. { zoneKey, name }
+	sortDir: SortDir; // "asc" oder "desc"
+	onZonesDeleted?: (deletedIds: string[]) => void; // <-- Neue Callback
+}
+
+export function ZonesFilters({
+	filters,
+	sortDir,
+	onZonesDeleted, // <-- WICHTIG: Destructure / entpacken
+}: ZonesFiltersProps) {
+	const { zoneKey, name } = filters;
+	const router = useRouter();
+	const selection = useZonesSelection();
+
+	// Hilfsfunktion zum URL-Update
+	const updateSearchParams = React.useCallback(
+		(newFilters: Filters, newSortDir: SortDir) => {
+			const searchParams = new URLSearchParams();
+
+			if (newFilters.zoneKey) {
+				searchParams.set("zoneKey", newFilters.zoneKey);
+			}
+			if (newFilters.name) {
+				searchParams.set("name", newFilters.name);
+			}
+			if (newSortDir === "asc") {
+				searchParams.set("sortDir", "asc");
+			}
+			router.push(`?${searchParams.toString()}`);
+		},
+		[router]
+	);
+
+	const handleZoneKeyChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
+		updateSearchParams({ ...filters, zoneKey: ev.target.value }, sortDir);
+	};
+	const handleNameChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
+		updateSearchParams({ ...filters, name: ev.target.value }, sortDir);
+	};
+
+	const handleSortChange = (ev: SelectChangeEvent) => {
+		updateSearchParams(filters, ev.target.value as SortDir);
+	};
+
+	const hasFilters = !!(zoneKey || name);
+	const handleClear = () => {
+		updateSearchParams({}, sortDir);
+	};
+
+	// **Mehrfach-Löschung**
+	const handleDeleteSelected = React.useCallback(async () => {
+		if (!window.confirm("Möchtest du alle selektierten Zonen wirklich löschen?")) {
+			return;
+		}
+
+		const idsToDelete = Array.from(selection.selected);
+		if (idsToDelete.length === 0) {
+			alert("Keine Zonen ausgewählt");
+			return;
+		}
+
+		try {
+			await bulkDeleteZones(idsToDelete);
+
+			// Nach Erfolg rufen wir dein Parent-Callback auf, wenn vorhanden
+			if (onZonesDeleted) {
+				onZonesDeleted(idsToDelete);
+			}
+		} catch (err) {
+			console.error("Mehrfach-Löschung error:", err);
+		}
+	}, [selection.selected, onZonesDeleted]);
+
+	return (
+		<>
+			<Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, flexWrap: "wrap" }}>
+				{/* LINKS: Filter-Felder */}
+				<Stack direction="row" spacing={2} alignItems="center">
+					<FormControl>
+						<InputLabel>Zone Key</InputLabel>
+						<OutlinedInput sx={{ width: 160 }} label="Zone Key" value={zoneKey ?? ""} onChange={handleZoneKeyChange} />
+					</FormControl>
+
+					<FormControl>
+						<InputLabel>Name</InputLabel>
+						<OutlinedInput sx={{ width: 160 }} label="Name" value={name ?? ""} onChange={handleNameChange} />
+					</FormControl>
+
+					{hasFilters && <Button onClick={handleClear}>Clear filters</Button>}
+				</Stack>
+
+				{/* RECHTS: (Selektion) + Sort */}
+				<Stack direction="row" spacing={2} alignItems="flex-end">
+					{/* Falls mindestens 1 Zeile ausgewählt => Delete-Button */}
+					{selection.selectedAny && (
+						<Stack direction="row" spacing={1.5} alignItems="center">
+							<Typography color="text.secondary" variant="body2">
+								{selection.selected.size} selected
+							</Typography>
+							<Button color="error" variant="contained" onClick={handleDeleteSelected}>
+								Delete
+							</Button>
+						</Stack>
+					)}
+
+					{/* Sort */}
+					<FormControl size="small">
+						<InputLabel>Sort</InputLabel>
+						<Select label="Sort" value={sortDir} onChange={handleSortChange} sx={{ width: 100 }}>
+							<option value="desc">Desc</option>
+							<option value="asc">Asc</option>
+						</Select>
+					</FormControl>
+				</Stack>
+			</Stack>
+
+			<Divider />
+		</>
+	);
+}
+
+// KOMPLETTE DATEI: apps/Dashboard/src/components/dashboard/categories/zones/zones-page-client.tsx
+
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getCategories } from "@/services/categories";
+import { getZones } from "@/services/zones";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import Divider from "@mui/material/Divider";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+
+import type { ZoneResult } from "./types";
+import { ZonesFilters } from "./zones-filters";
+import { ZonesPagination } from "./zones-pagination";
+import { ZonesSelectionProvider } from "./zones-selection-context";
+import { ZonesTable } from "./zones-table";
+
+/** 
+ * Exakt wie früher:
+ * Named Export: "ZonesPageClient".
+ * => Deine categories-view.tsx kann weiterhin
+ *    import { ZonesPageClient } from "./zones-page-client";
+ * verwenden.
+ */
+export function ZonesPageClient() {
+  const router = useRouter();
+  const [zones, setZones] = React.useState<ZoneResult[]>([]);
+  const [loading, setLoading] = React.useState<boolean>(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Such-Parameter aus der URL (optional)
+  const searchParams = useSearchParams();
+  const zoneKeyParam = searchParams?.get("zoneKey") ?? "";
+  const nameParam = searchParams?.get("name") ?? "";
+  const sortDir = (searchParams?.get("sortDir") as "asc" | "desc") ?? "desc";
+
+  // 1) Zonen laden
+  React.useEffect(() => {
+    async function fetchZones() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const data = await getZones();
+
+        // WICHTIG: voiceChannels ins Mapping übernehmen
+        const mapped: ZoneResult[] = data.map((z: any) => ({
+          id: z.id,
+          zoneKey: z.zoneKey,
+          zoneName: z.zoneName,
+          minutesRequired: z.minutesRequired,
+          pointsGranted: z.pointsGranted,
+          totalSecondsInZone: z.totalSecondsInZone ?? 0,
+          lastUsage: z.lastUsage ? new Date(z.lastUsage) : null,
+          categoryName: z.category ? z.category.name : null,
+          categoryDeletedInDiscord: z.category ? z.category.deletedInDiscord : false,
+
+          // NEU: Wenn du nur einen VoiceChannel pro Zone hast
+          voiceChannelId:
+            z.voiceChannels && z.voiceChannels.length > 0
+              ? z.voiceChannels[0].id
+              : null,
+          voiceChannelDeletedInDiscord:
+            z.voiceChannels && z.voiceChannels.length > 0
+              ? z.voiceChannels[0].deletedInDiscord
+              : false,
+        }));
+
+        setZones(mapped);
+      } catch (err: any) {
+        console.error("fetchZones error:", err);
+        setError(err.message ?? "Unknown error");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchZones();
+  }, []);
+
+  // 2) Für Mehrfach-Löschung => Zonen local aus State entfernen
+  const handleZonesDeleted = React.useCallback((deletedIds: string[]) => {
+    setZones((prev) => prev.filter((z) => !deletedIds.includes(z.id)));
+  }, []);
+
+  // 3) Filter & Sort (Clientseitig)
+  const filtered = React.useMemo(() => {
+    return zones.filter((z) => {
+      if (zoneKeyParam && !z.zoneKey.toLowerCase().includes(zoneKeyParam.toLowerCase())) {
+        return false;
+      }
+      if (nameParam && !z.zoneName.toLowerCase().includes(nameParam.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+  }, [zones, zoneKeyParam, nameParam]);
+
+  const sorted = React.useMemo(() => {
+    if (sortDir === "asc") {
+      return [...filtered].sort((a, b) => a.zoneName.localeCompare(b.zoneName));
+    }
+    return [...filtered].sort((a, b) => b.zoneName.localeCompare(a.zoneName));
+  }, [filtered, sortDir]);
+
+  // 4) NEUE ZONE ANLEGEN => Vorher checken, ob mind. 1 Kategorie existiert
+  const handleCreateZone = React.useCallback(async () => {
+    try {
+      const catData = await getCategories();
+
+      // Prüfen, ob catData.length > 0
+      if (!Array.isArray(catData) || catData.length === 0) {
+        alert("Keine Kategorie vorhanden! Lege zuerst eine Kategorie an, bevor du eine Zone erstellst.");
+        return;
+      }
+
+      // Wenn mind. eine Category da ist => zum Create-Form
+      router.push("/dashboard/categories/zones/create");
+    } catch (err: any) {
+      console.error("handleCreateZone error:", err);
+      alert("Fehler beim Prüfen der Kategorien: " + (err.message ?? String(err)));
+    }
+  }, [router]);
+
+  // 5) Render
+  return (
+    <Box sx={{ maxWidth: "100%", mx: "auto", width: "100%" }}>
+      <Stack spacing={4}>
+        {/* Überschrift + Button */}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={3}
+          sx={{ alignItems: "flex-start", justifyContent: "space-between" }}
+        >
+          <Typography variant="h4">Zonen Übersicht</Typography>
+          {/* HIER: handleCreateZone statt Link */}
+          <Button variant="contained" onClick={handleCreateZone}>
+            Neue Zone anlegen
+          </Button>
+        </Stack>
+
+        <ZonesSelectionProvider zones={sorted}>
+          <Card>
+            {/* Filter-Bereich */}
+            <ZonesFilters
+              filters={{ zoneKey: zoneKeyParam, name: nameParam }}
+              sortDir={sortDir}
+              onZonesDeleted={handleZonesDeleted}
+            />
+            <Divider />
+
+            {/* Lade-/Fehler-Zustand */}
+            {loading && (
+              <Typography color="text.secondary" variant="body2" sx={{ p: 2 }}>
+                Loading...
+              </Typography>
+            )}
+            {error && (
+              <Typography color="error" variant="body2" sx={{ p: 2 }}>
+                {error}
+              </Typography>
+            )}
+            {!loading && !error && <ZonesTable rows={sorted} />}
+
+            <Divider />
+            <ZonesPagination count={sorted.length} page={0} />
+          </Card>
+        </ZonesSelectionProvider>
+      </Stack>
+    </Box>
+  );
+}
+
+// apps/dashboard/src/components/dashboard/categories/zones/zones-pagination.tsx
+"use client";
+
+import * as React from "react";
+import TablePagination from "@mui/material/TablePagination";
+
+interface ZonesPaginationProps {
+	count: number;
+	page: number;
+}
+
+function noop() {
+	// NOP
+}
+
+/**
+ * Minimaler Fake-Paginator
+ */
+export function ZonesPagination({ count, page }: ZonesPaginationProps) {
+	return (
+		<TablePagination
+			component="div"
+			count={count}
+			onPageChange={noop}
+			onRowsPerPageChange={noop}
+			page={page}
+			rowsPerPage={10}
+			rowsPerPageOptions={[5, 10, 25]}
+		/>
+	);
+}
+
+// apps/dashboard/src/components/dashboard/categories/zones/zones-selection-context.tsx
+"use client";
+
+import * as React from "react";
+
+import { useSelection } from "@/hooks/use-selection"; // dein eigener Hook
+import type { Selection } from "@/hooks/use-selection";
+
+import type { ZoneResult } from "./types";
+
+function noop() {
+	// No operation
+}
+
+export interface ZonesSelectionContextValue extends Selection {}
+
+export const ZonesSelectionContext = React.createContext<ZonesSelectionContextValue>({
+	deselectAll: noop,
+	deselectOne: noop,
+	selectAll: noop,
+	selectOne: noop,
+	selected: new Set(),
+	selectedAny: false,
+	selectedAll: false,
+});
+
+interface ZonesSelectionProviderProps {
+	children: React.ReactNode;
+	zones: ZoneResult[];
+}
+
+/**
+ * Kapselt die Multi-Selection (Checkboxen in der Tabelle)
+ * in einem Context.
+ */
+export function ZonesSelectionProvider({ children, zones }: ZonesSelectionProviderProps): React.JSX.Element {
+	// IDs aller Zonen
+	const zoneIds = React.useMemo(() => zones.map((z) => z.id), [zones]);
+	// Dein Hook
+	const selection = useSelection(zoneIds);
+
+	return <ZonesSelectionContext.Provider value={{ ...selection }}>{children}</ZonesSelectionContext.Provider>;
+}
+
+export function useZonesSelection(): ZonesSelectionContextValue {
+	return React.useContext(ZonesSelectionContext);
+}
+
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import Typography from "@mui/material/Typography";
+import { NotePencil as NotePencilIcon } from "@phosphor-icons/react/dist/ssr/NotePencil";
+
+// NEU: Wir importieren den FAB und ein Icon 
+import Fab from "@mui/material/Fab";
+import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
+
+import { DataTable } from "@/components/core/data-table";
+import type { ColumnDef } from "@/components/core/data-table";
+import type { ZoneResult } from "./types";
+import { useZonesSelection } from "./zones-selection-context";
+import { restoreVoiceChannel } from "@/services/voice-channels";
+
+export interface ZonesTableProps {
+  rows: ZoneResult[];
+}
+
+export function ZonesTable({ rows }: ZonesTableProps) {
+  const { deselectAll, deselectOne, selectAll, selectOne, selected } = useZonesSelection();
+
+  // Wiederherstellen-Handler
+  const handleRestoreClick = React.useCallback(async (voiceChannelId?: string | null) => {
+    if (!voiceChannelId) return;
+    const confirmed = window.confirm("VoiceChannel wirklich wiederherstellen?");
+    if (!confirmed) return;
+
+    try {
+      await restoreVoiceChannel(voiceChannelId);
+      alert("VoiceChannel wurde wiederhergestellt. Seite wird neu geladen...");
+      window.location.reload();
+    } catch (err) {
+      console.error("Fehler beim Wiederherstellen:", err);
+      alert(String(err));
+    }
+  }, []);
+
+  // Spaltendefinitionen
+  const columns: ColumnDef<ZoneResult>[] = [
+    {
+      name: "Zonen Key",
+      width: "100px",
+      formatter: (row) => row.zoneKey,
+    },
+    {
+      name: "Zonen Name",
+      width: "150px",
+      formatter: (row) => row.zoneName,
+    },
+    {
+      name: "Minuten",
+      width: "80px",
+      formatter: (row) => row.minutesRequired,
+    },
+    {
+      name: "Punkte",
+      width: "80px",
+      formatter: (row) => row.pointsGranted,
+    },
+    {
+      name: "Gesamtzeit",
+      width: "120px",
+      formatter: (row) => {
+        const hours = Math.floor(row.totalSecondsInZone / 3600);
+        const minutes = Math.floor((row.totalSecondsInZone % 3600) / 60);
+        return `${hours}h ${minutes}m`;
+      },
+    },
+    {
+      // Kategorie (fett & rot bei categoryDeletedInDiscord)
+      name: "Kategorie",
+      width: "250px",
+      formatter: (row) => {
+        const text = row.categoryName || "-";
+        return (
+          <Box
+            sx={{
+              color: row.categoryDeletedInDiscord ? "error.main" : "inherit",
+              fontWeight: row.categoryDeletedInDiscord ? "bold" : "normal",
+            }}
+          >
+            {row.categoryDeletedInDiscord ? `${text} (Gelöscht)` : text}
+          </Box>
+        );
+      },
+    },
+    {
+      name: "Zuletzt benutzt",
+      width: "180px",
+      formatter: (row) => {
+        return row.lastUsage
+          ? new Date(row.lastUsage).toLocaleString()
+          : "-";
+      },
+    },
+    {
+      // Edit / Restore => Hier ersetzen wir den alten Button 
+      // durch einen MUI-FAB
+      name: "Edit / Restore",
+      hideName: true,
+      width: "100px",
+      align: "right",
+      formatter: (row) => {
+        if (row.voiceChannelDeletedInDiscord) {
+          // Falls VoiceChannel gelöscht => FAB zum Wiederherstellen
+          return (
+            <Fab
+              variant="extended"
+              size="small"
+              color="success"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRestoreClick(row.voiceChannelId);
+              }}
+              sx={{ textTransform: "none" }} // optional: damit "Wiederherstellen" nicht uppercase wird
+            >
+              {/* 
+                NavigationIcon links - 
+                du kannst auch ein anderes Icon importieren,
+                z.B. "RestartAlt" oder "Restore" etc.
+              */}
+              <RestoreFromTrashIcon sx={{ mr: 1 }} />
+              Wiederherstellen
+            </Fab>
+          );
+        }
+        // Normaler Zustand => Edit-Icon
+        return (
+          <IconButton
+            component={Link}
+            href={`/dashboard/categories/zones/edit/${row.id}`}
+          >
+            <NotePencilIcon />
+          </IconButton>
+        );
+      },
+    },
+  ];
+
+  return (
+    <>
+      <DataTable<ZoneResult>
+        columns={columns}
+        rows={rows}
+        selectable
+        selected={selected}
+        onSelectAll={selectAll}
+        onDeselectAll={deselectAll}
+        onSelectOne={(_, row) => selectOne(row.id)}
+        onDeselectOne={(_, row) => deselectOne(row.id)}
+        rowStyle={(row) => {
+          // Falls zone gelöscht => komplette Zeile rot
+          if (row.voiceChannelDeletedInDiscord) {
+            return { backgroundColor: "rgba(255, 0, 0, 0.08)" };
+          }
+          return {};
+        }}
+      />
+
+      {rows.length === 0 && (
+        <Box sx={{ p: 3 }}>
+          <Typography color="text.secondary" sx={{ textAlign: "center" }} variant="body2">
+            Keine Zone gefunden
+          </Typography>
+        </Box>
+      )}
+    </>
+  );
+}
+
+// apps/Dashboard/src/components/dashboard/categories/create-wizard/steps/CategoryDetailsStep/NameFieldSection.tsx
+"use client";
+
+import * as React from "react";
+import dynamic from "next/dynamic";
+import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Popover, TextField } from "@mui/material";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
+
+interface NameFieldSectionProps {
+	nameValue: string;
+	onNameChange: (newVal: string) => void;
+	maxLength?: number;
+}
+
+const LINES = [
+	"─",
+	"──",
+	"───",
+	"────",
+	"─────",
+	"═",
+	"══",
+	"═══",
+	"════",
+	"═════",
+	"══════",
+	"════════",
+	"╔",
+	"╗",
+	"╚",
+	"╝",
+	"╠",
+	"╣",
+	"╬",
+	"╔══",
+	"══╗",
+	"╚══",
+	"══╝",
+	"╠══",
+	"══╣",
+	"█",
+	"██",
+	"███",
+	"▓",
+	"▒",
+	"░",
+	"〓〓〓",
+	"〓〓〓〓〓",
+	"〓〓〓〓〓〓〓",
+	"━",
+	"━━",
+	"━━━━",
+	"━━━━━",
+	"┃",
+	"～",
+	"〜",
+	"〰",
+	"﹏",
+	"꧁",
+	"꧂",
+	"◆",
+	"◇",
+	"■",
+	"□",
+	"●",
+	"○",
+	"◎",
+	"◉",
+	"△",
+	"▽",
+	"★",
+	"☆",
+	"✦",
+	"✧",
+	"✪",
+	"✯",
+	"✰",
+	"→",
+	"⇒",
+	"➜",
+	"➤",
+	"➔",
+	"►",
+	"➢",
+	"➠",
+	"←",
+	"⇐",
+	"◄",
+	"⬅",
+	"❀",
+	"✿",
+	"❃",
+	"♥",
+	"❤",
+	"♡",
+	"❥",
+	"♪",
+	"♫",
+	"♬",
+	"♭",
+	"♯",
+	"━━━━━━━━",
+	"━━━━━━━━━━",
+	"━━━━━━━━━━━━",
+];
+
+export function NameFieldSection({ nameValue, onNameChange, maxLength = 25 }: NameFieldSectionProps) {
+	// STATE: Popover
+	const [emojiAnchor, setEmojiAnchor] = React.useState<HTMLButtonElement | null>(null);
+	const [linesAnchor, setLinesAnchor] = React.useState<HTMLButtonElement | null>(null);
+
+	// Handlers für Popover
+	const openEmojiPopover = (e: React.MouseEvent<HTMLButtonElement>) => {
+		setEmojiAnchor(e.currentTarget);
+	};
+	const closeEmojiPopover = () => setEmojiAnchor(null);
+
+	const openLinesPopover = (e: React.MouseEvent<HTMLButtonElement>) => {
+		setLinesAnchor(e.currentTarget);
+	};
+	const closeLinesPopover = () => setLinesAnchor(null);
+
+	// Emoji auswählen und einfügen
+	const handleEmojiClick = (emojiData: { emoji: string }) => {
+		const newVal = (nameValue + " " + emojiData.emoji).toUpperCase();
+		onNameChange(newVal.slice(0, maxLength)); // Länge beschränken
+	};
+
+	// Linie einfügen
+	const handleLineInsert = (line: string) => {
+		const newVal = (nameValue + " " + line).toUpperCase();
+		onNameChange(newVal.slice(0, maxLength));
+		closeLinesPopover();
+	};
+
+	return (
+		<TextField
+			variant="outlined"
+			label="Kategorie Name"
+			placeholder="z.B. '═══ Mining 🛠️ ═════════'"
+			value={nameValue}
+			onChange={(e) => {
+				let val = e.target.value.toUpperCase();
+				if (val.length > maxLength) val = val.slice(0, maxLength);
+				onNameChange(val);
+			}}
+			helperText={`Maximal ${maxLength} Zeichen. Wird in Discord GROSS geschrieben.`}
+			inputProps={{
+				style: { textTransform: "uppercase" },
+				maxLength,
+			}}
+			sx={{ flex: 1 }}
+			// <<---- HIER: endAdornment, damit die Icons auf Höhe des Eingabefelds bleiben
+			InputProps={{
+				endAdornment: (
+					<>
+						{/* Emoji-Picker-Icon + Popover */}
+						<IconButton onClick={openEmojiPopover}>
+							<EmojiEmotionsIcon />
+						</IconButton>
+						<Popover
+							open={Boolean(emojiAnchor)}
+							anchorEl={emojiAnchor}
+							onClose={closeEmojiPopover}
+							anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+						>
+							<Box sx={{ p: 1 }}>
+								<EmojiPicker onEmojiClick={handleEmojiClick} />
+							</Box>
+						</Popover>
+
+						{/* Lines-Picker-Icon + Popover */}
+						<IconButton onClick={openLinesPopover}>
+							<MoreHorizIcon />
+						</IconButton>
+						<Popover
+							open={Boolean(linesAnchor)}
+							anchorEl={linesAnchor}
+							onClose={closeLinesPopover}
+							anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+						>
+							<List dense sx={{ minWidth: 80 }}>
+								{LINES.map((line) => (
+									<ListItem key={line} disablePadding>
+										<ListItemButton onClick={() => handleLineInsert(line)}>
+											<ListItemText primary={line} />
+										</ListItemButton>
+									</ListItem>
+								))}
+							</List>
+						</Popover>
+					</>
+				),
+			}}
+		/>
+	);
+}
+
+// apps/Dashboard/src/components/dashboard/categories/create-wizard/steps/CategoryDetailsStep/RoleSelectSection.tsx
+"use client";
+
+import * as React from "react";
+import { getRoles } from "@/services/roles";
+import { Autocomplete, TextField } from "@mui/material";
+
+interface Role {
+	id: string;
+	name: string;
+}
+
+interface RoleSelectSectionProps {
+	selectedRoleIds: string[];
+	onChange: (newIds: string[]) => void;
+}
+
+export function RoleSelectSection({ selectedRoleIds, onChange }: RoleSelectSectionProps) {
+	const [roles, setRoles] = React.useState<Role[]>([]);
+
+	// Rollen laden
+	React.useEffect(() => {
+		getRoles()
+			.then((data) => {
+				// data = { roles: [...] } oder nur [...]
+				const roleArray = data.roles ?? data; // je nach API
+				setRoles(roleArray);
+			})
+			.catch((err) => console.error("Rollen laden error:", err));
+	}, []);
+
+	// Ausgewählte Roles als Objekte
+	const selectedObjects = React.useMemo(
+		() => roles.filter((r) => selectedRoleIds.includes(r.id)),
+		[roles, selectedRoleIds]
+	);
+
+	return (
+		<Autocomplete
+			multiple
+			options={roles}
+			value={selectedObjects}
+			getOptionLabel={(r) => r.name}
+			isOptionEqualToValue={(opt, val) => opt.id === val.id}
+			onChange={(_evt, newObjs) => {
+				const newIds = newObjs.map((o) => o.id);
+				onChange(newIds);
+			}}
+			renderInput={(params) => (
+				<TextField {...params} variant="outlined" label="Welche Rollen werden getrackt?" placeholder="Wähle aus..." />
+			)}
+		/>
+	);
+}
+
+// apps/Dashboard/src/components/dashboard/categories/create-wizard/steps/CategoryDetailsStep/VisibilitySwitches.tsx
+"use client";
+
+import * as React from "react";
+import { FormControlLabel, Stack, Switch, Typography } from "@mui/material";
+
+interface VisibilitySwitchesProps {
+	isVisible: boolean;
+	trackingActive: boolean;
+	sendSetup: boolean;
+	onChange: (partial: { isVisible?: boolean; trackingActive?: boolean; sendSetup?: boolean }) => void;
+}
+
+export function VisibilitySwitches({ isVisible, trackingActive, sendSetup, onChange }: VisibilitySwitchesProps) {
+	const handleVisibleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		onChange({ isVisible: e.target.checked });
+	};
+	const handleTrackingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		onChange({ trackingActive: e.target.checked });
+	};
+	const handleSendSetupChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		onChange({ sendSetup: e.target.checked });
+	};
+
+	return (
+		<Stack spacing={2}>
+		  <Typography variant="h6">Optionen</Typography>
+		  <Stack direction="row" spacing={3} sx={{ flexWrap: "wrap" }}>
+			{/* Tracking ist IMMER sichtbar */}
+			<FormControlLabel
+			  control={<Switch checked={trackingActive} onChange={handleTrackingChange} />}
+			  label="Tracking aktivieren?"
+			/>
+        {/* Nur anzeigen, wenn trackingActive = true */}
+        {trackingActive && (
+          <>
+            <FormControlLabel
+              control={<Switch checked={isVisible} onChange={handleVisibleChange} />}
+              label="Kategorie Sichtbar?"
+            />
+            <FormControlLabel
+              control={<Switch checked={sendSetup} onChange={handleSendSetupChange} />}
+              label="Setup senden?"
+            />
+          </>
+        )}
+
+			</Stack>
+		</Stack>
+	);
+}
+
+// apps/Dashboard/src/components/dashboard/categories/create-wizard/steps/CategoryDetailsStep.tsx
+"use client";
+
+import * as React from "react";
+import { Box, Button, Stack, Typography } from "@mui/material";
+import { ArrowLeft as ArrowLeftIcon } from "@phosphor-icons/react/dist/ssr/ArrowLeft";
+import { ArrowRight as ArrowRightIcon } from "@phosphor-icons/react/dist/ssr/ArrowRight";
+
+import { NameFieldSection } from "../../shared/NameFieldSection";
+import { RoleSelectSection } from "../../shared/RoleSelectSection";
+import { VisibilitySwitches } from "../../shared/VisibilitySwitches";
+
+interface CategoryDetailsStepProps {
+	name: string;
+	tags: string[];
+	isVisible: boolean;
+	trackingActive: boolean;
+	sendSetup: boolean;
+	onChange: (
+		partial: Partial<{
+			name: string;
+			tags: string[];
+			isVisible: boolean;
+			trackingActive: boolean;
+			sendSetup: boolean;
+		}>
+	) => void;
+	onNext?: () => void;
+	onBack?: () => void;
+}
+
+export function CategoryDetailsStep({
+	name,
+	tags,
+	isVisible,
+	trackingActive,
+	sendSetup,
+	onChange,
+	onNext,
+	onBack,
+}: CategoryDetailsStepProps) {
+	// Handler: Name
+	const handleNameChange = (newVal: string) => {
+		onChange({ name: newVal });
+	};
+
+	// Handler: Roles
+	const handleRoleIdsChange = (newIds: string[]) => {
+		onChange({ tags: newIds });
+	};
+
+	// Handler: Switches
+	const handleVisibilityChange = (partial: { isVisible?: boolean; trackingActive?: boolean; sendSetup?: boolean }) => {
+		onChange(partial);
+	};
+
+	return (
+		    <Stack spacing={4}>
+      {/* 1) Oberer Block: Name */}
+      <Stack spacing={3}>
+        <div>
+          <Typography variant="h6">Kategorie Details</Typography>
+        </div>
+        {/* Name-Feld */}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          alignItems={{ xs: "stretch", sm: "flex-end" }}
+        >
+          <NameFieldSection nameValue={name} onNameChange={handleNameChange} />
+        </Stack>
+      </Stack>
+
+      {/* 2) Tracking-Switches => Tracking immer sichtbar */}
+      <VisibilitySwitches
+        isVisible={isVisible}
+        trackingActive={trackingActive}
+        sendSetup={sendSetup}
+        onChange={handleVisibilityChange}
+      />
+
+      {/* 3) Rollen => erst wenn trackingActive=true */}
+      {trackingActive && (
+        <Stack spacing={3}>
+          <RoleSelectSection selectedRoleIds={tags} onChange={handleRoleIdsChange} />
+        </Stack>
+      )}
+
+      {/* 4) Buttons */}
+      <Stack direction="row" spacing={2} justifyContent="flex-end" alignItems="center">
+        <Button color="secondary" startIcon={<ArrowLeftIcon />} onClick={onBack}>
+          Back
+        </Button>
+        <Button variant="contained" endIcon={<ArrowRightIcon />} onClick={onNext}>
+          Weiter
+        </Button>
+      </Stack>
+    </Stack>
+   );
+ }
+
+// apps/Dashboard/src/components/dashboard/categories/create-wizard/steps/CategoryPreview
+
+"use client";
+
+import * as React from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getRoles } from "@/./services/roles";
+import { createCategory } from "@/services/categories";
+import Avatar from "@mui/material/Avatar";
+import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { Check as CheckIcon } from "@phosphor-icons/react/dist/ssr/Check";
+import type { CategoryFormData } from "../types"; 
+
+export function CategoryPreview({ formData }: { formData: CategoryFormData }) {
+	const router = useRouter();
+	// 2) State für alle Rollen -> {id, name}
+	const [allRoles, setAllRoles] = useState<{ id: string; name: string }[]>([]);
+
+	// Final speichern => POST /api/categories
+	const handleFinish = React.useCallback(async () => {
+		try {
+			await createCategory({
+				name: formData.name,
+				categoryType: formData.categoryType,
+				isVisible: formData.isVisible,
+				allowedRoles: formData.tags,
+				trackingActive: formData.trackingActive,
+				sendSetup: formData.sendSetup,
+			});
+			router.push("/dashboard/categories");
+		} catch (err) {
+			console.error("handleFinish error:", err);
+			alert("Unerwarteter Fehler: " + String(err));
+		}
+	}, [formData, router]);
+
+	// 3) useEffect zum Laden aller Rollen (via Nest-API)
+	useEffect(() => {
+		getRoles()
+			.then((data) => {
+				// data = { roles: [ ... ] } je nach API
+				setAllRoles(data.roles || []);
+			})
+			.catch((err) => {
+				console.error("Fehler beim Laden der Rollen:", err);
+			});
+	}, []);
+
+	return (
+		<Stack spacing={2}>
+			{/* Grünes Icon */}
+			<Avatar
+				sx={{
+					"--Icon-fontSize": "var(--icon-fontSize-lg)",
+					bgcolor: "var(--mui-palette-success-main)",
+					color: "var(--mui-palette-success-contrastText)",
+				}}
+			>
+				<CheckIcon fontSize="var(--Icon-fontSize)" />
+			</Avatar>
+
+			<div>
+				<Typography variant="h6">All Done!</Typography>
+				<Typography variant="body2" color="text.secondary">
+					Hier eine Vorschau der erstellten Kategorie
+				</Typography>
+			</div>
+
+			{/* Beispiel-Card als "Erfolgsmeldung" */}
+			<Card variant="outlined">
+				<Stack
+					direction="row"
+					sx={{
+						alignItems: "center",
+						flexWrap: "wrap",
+						justifyContent: "space-between",
+						px: 2,
+						py: 1.5,
+					}}
+				>
+					<div>
+						{/* Echte Daten aus formData */}
+						<Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+							{formData.name || "Kein Name"}
+						</Typography>
+						<Typography variant="caption" color="text.secondary" display="block">
+							Type: {formData.categoryType}
+						</Typography>
+
+						{/* 4) Hier ID => Name Mapping */}
+						<Typography variant="caption" color="text.secondary" display="block">
+							{/* IDs -> Name */}
+							Access:{" "}
+							{formData.tags
+								.map((roleId) => {
+									const found = allRoles.find((r) => r.id === roleId);
+									return found ? found.name : `Unbekannte ID: ${roleId}`;
+								})
+								.join(", ")}
+						</Typography>
+						<Typography variant="caption" color="text.secondary" display="block">
+							Sichtbar: {formData.isVisible ? "Ja" : "Nein"}
+						</Typography>
+					</div>
+
+					<Stack direction="row" spacing={2} alignItems="center">
+						<Typography color="text.secondary" variant="caption">
+							Erfolgreich erstellt
+						</Typography>
+						<Button size="small" onClick={handleFinish}>
+							Kategorie anlegen
+						</Button>
+					</Stack>
+				</Stack>
+			</Card>
+		</Stack>
+	);
+}
+
+// apps/Dashboard/src/components/dashboard/categories/create-wizard/steps/CategoryTypeStep.tsx
+"use client";
+
+import * as React from "react";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { ArrowRight as ArrowRightIcon } from "@phosphor-icons/react/dist/ssr/ArrowRight";
+
+interface CategoryTypeStepProps {
+	value: string;
+	onChange: (newVal: string) => void;
+	onNext?: () => void;
+	onBack?: () => void;
+}
+
+/** Dummy-Optionen, nur zur Veranschaulichung */
+const categoryOptions = [
+	{
+		title: "Allianz Ebene",
+		description: "Ein Zonenbereich für die Allianz eröffnen",
+		value: "freelancers",
+		disabled: false,
+	},
+	{
+		title: "Orgaisation Ebene",
+		description: "Eröffnet einen Kategorie Zonenbereich für die Organisation",
+		value: "contractors",
+		disabled: false,
+	},
+	{
+		title: "Sub Organisation Ebene",
+		description: "Eröffnet einen Kategorie Zonenbereich für die Suborganisation",
+		value: "employees",
+		disabled: false,
+	},
+] as const;
+
+export function CategoryTypeStep({ value, onChange, onNext, onBack }: CategoryTypeStepProps): React.JSX.Element {
+	// Wir leiten Änderungen an den Eltern-State weiter
+	const handleCategoryChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+		onChange(event.target.value);
+	};
+
+	return (
+		<Stack spacing={3}>
+			<div>
+				<Typography variant="h6">Für welchen Type möchtest Du eine neue Kategorie eröffnen?</Typography>
+			</div>
+
+			<RadioGroup
+				onChange={handleCategoryChange}
+				value={value}
+				sx={{
+					"& .MuiFormControlLabel-root": {
+						border: "1px solid var(--mui-palette-divider)",
+						borderRadius: 1,
+						gap: 2,
+						p: 2,
+						position: "relative",
+						"&::before": {
+							borderRadius: "inherit",
+							bottom: 0,
+							content: '" "',
+							left: 0,
+							pointerEvents: "none",
+							position: "absolute",
+							right: 0,
+							top: 0,
+						},
+						"&.Mui-disabled": {
+							bgcolor: "var(--mui-palette-background-level1)",
+						},
+					},
+				}}
+			>
+				{categoryOptions.map((option) => (
+					<FormControlLabel
+						key={option.value}
+						control={<Radio />}
+						value={option.value}
+						disabled={option.disabled}
+						label={
+							<div>
+								<Typography
+									variant="inherit"
+									sx={{
+										color: option.disabled ? "var(--mui-palette-action-disabled)" : "var(--mui-palette-text-primary)",
+									}}
+								>
+									{option.title}
+								</Typography>
+								<Typography
+									variant="body2"
+									sx={{
+										color: option.disabled ? "var(--mui-palette-action-disabled)" : "var(--mui-palette-text-secondary)",
+									}}
+								>
+									{option.description}
+								</Typography>
+							</div>
+						}
+						sx={{
+							...(option.value === value && {
+								"&::before": {
+									boxShadow: "0 0 0 2px var(--mui-palette-primary-main)",
+								},
+							}),
+						}}
+					/>
+				))}
+			</RadioGroup>
+
+			{/* Buttons (forward/back) */}
+			<Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+				<Button variant="contained" endIcon={<ArrowRightIcon />} onClick={onNext}>
+					Nächster Schritt
+				</Button>
+			</Box>
+		</Stack>
+	);
+}
+
+// apps/Dashboard/src/components/dashboard/categories/create-wizard/CategoryWizard.tsx
+"use client";
+
+import * as React from "react";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Step from "@mui/material/Step";
+import StepContent from "@mui/material/StepContent";
+import StepLabel from "@mui/material/StepLabel";
+import Stepper from "@mui/material/Stepper";
+import Typography from "@mui/material/Typography";
+import { Check as CheckIcon } from "@phosphor-icons/react/dist/ssr/Check";
+
+import { CategoryDetailsStep } from "./steps/CategoryDetailsStep";
+import { CategoryPreview } from "./steps/CategoryPreview";
+import { CategoryTypeStep } from "./steps/CategoryTypeStep";
+import type { CategoryFormData } from "./types";
+
+function WizardStepIcon({ active, completed, icon }: any) {
+	const highlight = active || completed;
+	return (
+		<Avatar
+			sx={{
+				...(highlight && {
+					bgcolor: "var(--mui-palette-primary-main)",
+					color: "var(--mui-palette-primary-contrastText)",
+				}),
+			}}
+			variant="rounded"
+		>
+			{completed ? <CheckIcon /> : icon}
+		</Avatar>
+	);
+}
+
+/**
+ * Wizard-Form, 2 Schritte + Preview-Screen
+ * => Bisher: "CategoryCreateForm"
+ */
+export function CategoryWizard(): React.JSX.Element {
+	// Step-Index
+	const [activeStep, setActiveStep] = React.useState<number>(0);
+
+	// Ob wir fertig sind => Preview
+	const [isComplete, setIsComplete] = React.useState<boolean>(false);
+
+	// Form-State
+	const [formData, setFormData] = React.useState<CategoryFormData>({
+		categoryType: "freelancers",
+		name: "",
+		tags: [],
+		isVisible: true,
+		trackingActive: false,
+		sendSetup: false,
+	});
+
+	// Schritt vor
+	const handleNext = React.useCallback(() => {
+		setActiveStep((prev) => prev + 1);
+	}, []);
+
+	// Schritt zurück
+	const handleBack = React.useCallback(() => {
+		setActiveStep((prev) => prev - 1);
+	}, []);
+
+	// Letzter Schritt => fertig => zeige Preview
+	const handleComplete = React.useCallback(() => {
+		setIsComplete(true);
+	}, []);
+
+	// Steps-Array
+	const steps = React.useMemo(() => {
+		return [
+			{
+				label: "Kategorie Typ",
+				content: (
+					<CategoryTypeStep
+						value={formData.categoryType}
+						onChange={(newVal) => setFormData((prev) => ({ ...prev, categoryType: newVal }))}
+						onNext={handleNext}
+						onBack={handleBack}
+					/>
+				),
+			},
+			{
+				label: "Details",
+				content: (
+					<CategoryDetailsStep
+						name={formData.name}
+						tags={formData.tags}
+						isVisible={formData.isVisible}
+						trackingActive={formData.trackingActive}
+						sendSetup={formData.sendSetup}
+						onChange={(partial) => {
+							setFormData((prev) => ({ ...prev, ...partial }));
+						}}
+						onNext={handleComplete}
+						onBack={handleBack}
+					/>
+				),
+			},
+		];
+	}, [formData, handleNext, handleBack, handleComplete]);
+
+	if (isComplete) {
+		return <CategoryPreview formData={formData} />;
+	}
+
+	return (
+		<Stepper
+			activeStep={activeStep}
+			orientation="vertical"
+			sx={{
+				"& .MuiStepConnector-root": { ml: "19px" },
+				"& .MuiStepConnector-line": {
+					borderLeft: "2px solid var(--mui-palette-divider)",
+				},
+				"& .MuiStepLabel-iconContainer": { paddingRight: "16px" },
+				"& .MuiStepContent-root": {
+					borderLeft: "2px solid var(--mui-palette-divider)",
+					ml: "19px",
+				},
+				"& .MuiStep-root:last-of-type .MuiStepContent-root": {
+					borderColor: "transparent",
+				},
+			}}
+		>
+			{steps.map((step, index) => (
+				<Step key={step.label}>
+					<StepLabel StepIconComponent={WizardStepIcon}>
+						<Typography variant="overline">{step.label}</Typography>
+					</StepLabel>
+					<StepContent>
+						<Box sx={{ px: 2, py: 3 }}>{step.content}</Box>
+					</StepContent>
+				</Step>
+			))}
+		</Stepper>
+	);
+}
+
+// apps/Dashboard/src/components/dashboard/categories/create-wizard/types.ts
+
+export interface CategoryFormData {
+	categoryType: string; // z. B. "employees" | "freelancers" etc.
+	name: string;
+	tags: string[];
+	isVisible: boolean;
+	trackingActive: boolean;
+	sendSetup: boolean;
+}
+
+// apps/Dashboard/src/components/dashboard/categories/category-edit-form/category-edit-form.tsx
+"use client";
+
+import * as React from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Box,
+  Button,
+  FormControlLabel,
+  Radio,
+  RadioGroup,
+  Stack,
+  Switch,
+  Typography,
+} from "@mui/material";
+
+import { deleteCategoryHard, updateCategory, getCategories } from "@/services/categories";
+
+import { NameFieldSection } from "@/components/dashboard/categories/shared/NameFieldSection";
+import { RoleSelectSection } from "@/components/dashboard/categories/shared/RoleSelectSection";
+import { VisibilitySwitches } from "@/components/dashboard/categories/shared/VisibilitySwitches";
+
+interface CategoryData {
+  id: string;
+  categoryType: string;
+  name: string;
+  tags: string[];
+  isVisible: boolean;
+  trackingActive?: boolean;
+  sendSetup?: boolean;
+}
+
+const categoryOptions = [
+  {
+    title: "Allianz Ebene",
+    description: "Ein Zonenbereich für die Allianz eröffnen",
+    value: "freelancers",
+    disabled: false,
+  },
+  {
+    title: "Organisation Ebene",
+    description: "Eröffnet einen Zonenbereich für die Organisation",
+    value: "contractors",
+    disabled: false,
+  },
+  {
+    title: "Sub Organisation Ebene",
+    description: "Zonenbereich für die Suborganisation (Nicht Sichtbar für Nicht-Mitglieder)",
+    value: "employees",
+    disabled: false,
+  },
+] as const;
+
+interface CategoryEditFormProps {
+  category: CategoryData;
+}
+
+export function CategoryEditForm({ category }: CategoryEditFormProps) {
+  const router = useRouter();
+
+  // Lokale States – initialisiert mit den Props, die reinkommen
+  const [categoryType, setCategoryType] = useState(category.categoryType);
+  const [name, setName] = useState(category.name);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>(category.tags);
+
+  const [isVisible, setIsVisible] = useState(category.isVisible);
+  const [trackingActive, setTrackingActive] = useState(category.trackingActive ?? false);
+  const [sendSetup, setSendSetup] = useState(category.sendSetup ?? false);
+
+  // =========================================================
+  // 1) useEffect => überschreibe State mit ECHTEM DB-Stand
+  // =========================================================
+  useEffect(() => {
+    // Nur ausführen, wenn wir eine category.id haben
+    if (!category.id) return;
+
+    getCategories()
+      .then((allCats) => {
+        const freshCat = allCats.find((c: any) => c.id === category.id);
+        if (!freshCat) {
+          console.warn("Keine Kategorie mit ID=", category.id, "im Array gefunden!");
+          return;
+        }
+
+        // Wichtig: Falls die DB z. B. trackingActive: true hat,
+        // überschreiben wir JETZT die States:
+        setCategoryType(freshCat.categoryType);
+        setName(freshCat.name);
+        setSelectedRoleIds(freshCat.allowedRoles ?? []); // oder freshCat.tags
+        setIsVisible(freshCat.isVisible);
+        setTrackingActive(freshCat.trackingActive ?? false);
+        setSendSetup(freshCat.sendSetup ?? false);
+      })
+      .catch((err) => {
+        console.error("Fehler beim Laden der Kategorien:", err);
+      });
+  }, [category.id]);
+  // => Beim ersten Rendern wird getCategories() aufgerufen,
+  // => Dann füllen wir die States mit dem "frischesten" DB-Stand.
+
+  // =========================================================
+  // 2) Patch => Update in DB
+  // =========================================================
+  const handleSave = useCallback(async () => {
+    try {
+      await updateCategory(category.id, {
+        name,
+        categoryType,
+        isVisible,
+        allowedRoles: selectedRoleIds,
+        trackingActive,
+        sendSetup,
+      });
+      router.push("/dashboard/categories");
+    } catch (err) {
+      console.error("handleSave error:", err);
+      alert("Unerwarteter Fehler beim Update: " + String(err));
+    }
+  }, [
+    category.id,
+    name,
+    categoryType,
+    isVisible,
+    selectedRoleIds,
+    trackingActive,
+    sendSetup,
+    router,
+  ]);
+
+  // =========================================================
+  // 3) Delete => DELETE /categories/:id
+  // =========================================================
+  const handleDelete = useCallback(async () => {
+    const confirmed = window.confirm("Wirklich löschen?");
+    if (!confirmed) return;
+
+    try {
+      await deleteCategoryHard(category.id);
+      router.push("/dashboard/categories");
+    } catch (err) {
+      console.error("handleDelete error:", err);
+      alert("Fehler beim Löschen: " + String(err));
+    }
+  }, [category.id, router]);
+
+  // =========================================================
+  // 4) Render UI
+  // =========================================================
+  return (
+    <Stack spacing={4}>
+      {/* A) Kategorie-Typ */}
+      <Stack spacing={3}>
+        <Typography variant="h6">Kategorie-Typ</Typography>
+        <RadioGroup
+          onChange={(e) => setCategoryType(e.target.value)}
+          value={categoryType}
+          sx={{
+            "& .MuiFormControlLabel-root": {
+              border: "1px solid var(--mui-palette-divider)",
+              borderRadius: 1,
+              gap: 2,
+              p: 2,
+              position: "relative",
+              "&::before": {
+                borderRadius: "inherit",
+                bottom: 0,
+                content: '" "',
+                left: 0,
+                pointerEvents: "none",
+                position: "absolute",
+                right: 0,
+                top: 0,
+              },
+              "&.Mui-disabled": {
+                bgcolor: "var(--mui-palette-background-level1)",
+              },
+            },
+          }}
+        >
+          {categoryOptions.map((option) => (
+            <FormControlLabel
+              key={option.value}
+              control={<Radio />}
+              value={option.value}
+              disabled={option.disabled}
+              label={
+                <div>
+                  <Typography variant="inherit">{option.title}</Typography>
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    {option.description}
+                  </Typography>
+                </div>
+              }
+              sx={{
+                ...(option.value === categoryType && {
+                  "&::before": {
+                    boxShadow: "0 0 0 2px var(--mui-palette-primary-main)",
+                  },
+                }),
+              }}
+            />
+          ))}
+        </RadioGroup>
+      </Stack>
+      {/* D) Sichtbarkeit => Alle 3 Switches */}
+      <Stack spacing={2}>
+      {/* Switches => Tracking immer */}
+      <VisibilitySwitches
+        isVisible={isVisible}
+        trackingActive={trackingActive}
+        sendSetup={sendSetup}
+        onChange={(partial) => {
+          if (partial.isVisible !== undefined) {
+        setIsVisible(partial.isVisible);
+      }
+          if (partial.trackingActive !== undefined) {
+        setTrackingActive(partial.trackingActive);
+          if (!partial.trackingActive) {
+        setSendSetup(false);
+      }
+    }
+    if (partial.sendSetup !== undefined) {
+      setSendSetup(partial.sendSetup);
+    }
+  }}
+        />
+
+    {/* Rollen + KategorieSichtbarkeit erst bei trackingActive */}
+      {trackingActive && (
+      <RoleSelectSection
+      selectedRoleIds={selectedRoleIds}
+      onChange={(newIds) => setSelectedRoleIds(newIds)}
+      />
+      )} 
+      </Stack>
+
+      {/* E) Footer Buttons */}
+      <Stack direction="row" spacing={2} justifyContent="flex-end">
+        <Button color="error" variant="outlined" onClick={handleDelete}>
+          Löschen
+        </Button>
+        <Button variant="contained" onClick={handleSave}>
+          Änderungen speichern
+        </Button>
+      </Stack>
+    </Stack>
+  );
+}
+
+// apps/Dashboard/src/services/categories.ts
+import { request } from "./http"; // <-- aus deinem http.ts
+
+/** Restore-Funktion für eine Kategorie (PATCH /categories/restore/:id) */
+export function restoreCategory(categoryId: string) {
+	return request(`categories/restore/${categoryId}`, {
+		method: "PATCH",
+	});
+}
+
+/** Update einer Kategorie via PATCH /categories/:id */
+export function updateCategory(categoryId: string, payload: any) {
+	return request(`categories/${categoryId}`, {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(payload),
+	});
+}
+
+/** Löscht eine Kategorie via DELETE /categories/:id */
+export function deleteCategory(categoryId: string) {
+	return request(`categories/${categoryId}`, {
+		method: "DELETE",
+	});
+}
+
+/** Erstellt eine Kategorie via POST /categories */
+export function createCategory(payload: any) {
+	return request("categories", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(payload),
+	});
+}
+
+export function getCategories() {
+	return request("categories"); // GET /categories
+}
+
+
+export async function deleteCategoryHard(id: string) {
+	  return request(`categories/${id}/hard`, {
+	    method: "DELETE",
+	  });
+	}
+
+// apps/Dashboard/src/services/http.ts
+
+/**
+ * request(path, options?)
+ *  - Baut die baseUrl + path zusammen
+ *  - führt fetch() aus
+ *  - checkt den .ok-Status
+ *  - parst JSON
+ *  - wirft bei Fehlern eine Error-Exception (die du abfangen kannst)
+ */
+export async function request(path: string, options: RequestInit = {}): Promise<any> {
+	const baseUrl = process.env.NEXT_PUBLIC_API_URL; // z.B. "http://localhost:3004" oder Prod-URL
+	const url = `${baseUrl}/${path}`;
+
+	const response = await fetch(url, {
+		// Standard-Method = GET
+		method: options.method ?? "GET",
+		...options,
+	});
+
+	// Fehlermeldung extrahieren
+	if (!response.ok) {
+		// Versuchen, JSON zu parsen (kann schiefgehen)
+		let errorBody: any = null;
+		try {
+			errorBody = await response.json();
+		} catch (err) {
+			/* ignore parse error */
+		}
+
+		const msg = errorBody?.message || errorBody?.error || response.statusText || "API Error";
+
+		// Wir werfen einen richtigen Error in JS
+		throw new Error(msg);
+	}
+
+	// Erfolg => JSON zurückgeben
+	return response.json();
+}
+
+// apps/Dashboard/src/services/roles.ts
+import { request } from "./http";
+
+/** Liest die Rollen via GET /roles */
+export function getRoles() {
+	return request("roles");
+}
+import { request } from "./http";
+
+/** PATCH /voice-channels/restore/:id => VoiceChannel wiederherstellen */
+export function restoreVoiceChannel(voiceChannelId: string) {
+return request(`voice-channels/restore/${voiceChannelId}`, {
+method: "PATCH",
+});
+ }
+
+
+// apps/Dashboard/src/services/zones.ts
+
+import { request } from "./http";
+
+/** Liest alle Zonen => GET /zones */
+export function getZones() {
+	return request("zones");
+}
+
+/** Erstellt eine Zone => POST /zones */
+export function createZone(payload: any) {
+	return request("zones", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(payload),
+	});
+}
+
+/** Updated eine Zone => PATCH /zones/:id */
+export function updateZone(zoneId: string, payload: any) {
+	return request(`zones/${zoneId}`, {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(payload),
+	});
+}
+
+/** Löscht eine Zone => DELETE /zones/:id */
+export function deleteZone(zoneId: string) {
+	return request(`zones/${zoneId}`, {
+		method: "DELETE",
+	});
+}
+
+/**
+ * Bulk-Löschung von Zonen => POST /zones/bulk-delete
+ * (falls du das so in Nest.js implementiert hast)
+ */
+export function bulkDeleteZones(zoneIds: string[]) {
+	return request("zones/bulk-delete", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ zoneIds }),
+	});
+}
+
+Bot Node.js
+
+// apps/Bot/src/events/channelDeleteHandler.ts
+
+import { Channel, ChannelType } from "discord.js";
+import logger from "../services/logger";
+import axios from "axios";
+
+/**
+ * Wird aufgerufen, sobald im Discord ein Channel gelöscht wird.
+ * Prüfe, ob es sich um eine Kategorie handelt, und informiere ggf. die API.
+ */
+export async function channelDeleteHandler(channel: Channel) {
+  try {
+    // Nur weiter, wenn es eine Category ist
+    if (channel.type !== ChannelType.GuildCategory) {
+      return;
+    }
+
+    const channelId = channel.id; // Discord-Kanal-ID
+    logger.info(`[Bot] channelDelete: Category ${channelId} wurde manuell gelöscht.`);
+
+    // Der Bot sagt der API: "Channel X ist gelöscht" => wir nutzen dasselbe Feld `discordCategoryId`
+    const apiUrl = process.env.API_URL || "http://localhost:3004";
+    const response = await axios.patch(`${apiUrl}/categories/discord-deleted`, {
+      // Sende dem API-Endpoint `discordCategoryId`
+      discordCategoryId: channelId,
+    });
+
+    logger.info(
+      `[Bot] Meldung an API gesendet: Category ${channelId} gelöscht. Antwort:`,
+      response.data
+    );
+  } catch (err) {
+    logger.error("[Bot] Fehler in channelDeleteHandler:", err);
+  }
+}
+
+
+// Pfad: apps/Bot/src/events/interactionCreate.ts
+import { Interaction } from 'discord.js';
+import { client } from '../index';
+import { handleWizardInteraction } from '../interaction_handlers/wizardInteractions'; // Unser Wizard-Handler
+
+
+client.on("interactionCreate", async (interaction) => {
+  // ... vorhandener Code, z.B. SlashCommands, etc.
+
+  if (interaction.isButton()) {
+    if (interaction.customId.startsWith("wizard:")) {
+      const { handleWizardInteraction } = require("./interaction_handlers/wizardInteractions");
+      return handleWizardInteraction(interaction);
+    }
+  }
+});
+
+
+// apps/Bot/src/events/voiceStateUpdate.ts
+import { VoiceState } from "discord.js";
+import axios from "axios";
+import logger from "../services/logger";
+
+/**
+ * NEUES voiceStateUpdate, das die 
+ * /tracking/join + /tracking/leave Endpunkte anpingt.
+ */
+export default async function voiceStateUpdateNew(oldState: VoiceState, newState: VoiceState) {
+  // 1) Prüfen, ob User einen VoiceChannel betritt
+  const apiUrl = process.env.API_URL || "http://localhost:3004"; // oder 3000, je nachdem
+  const userId = newState.member?.id;  // oder oldState.member?.id
+  if (!userId) return;
+
+  // 2) zoneId herausfinden
+  //    => wie? Du hast in DB voiceChannel.discordChannelId => zoneId => zone
+  //    => hier z.B. per axios GET /voice-channels?discordId=...
+  //    => oder via /zones?filter=...
+  //    => zur Demo: wir tun so, als könnten wir es resolven:
+
+  const findZoneIdForChannel = async (discordChannelId: string) => {
+    // Minimal-Demo: GET /voice-channels/lookup?discordChannelId=...
+    try {
+      const resp = await axios.get(`${apiUrl}/voice-channels/lookup`, {
+        params: { discordChannelId },
+      });
+      // => { zoneId: '...' }
+      return resp.data.zoneId as string | null;
+    } catch (err) {
+      logger.warn("channel -> zone lookup fail", err);
+      return null;
+    }
+  };
+
+  // 3) Jemand joined => newState.channelId != null, oldState.channelId == null
+  if (!oldState.channelId && newState.channelId) {
+    // user joins
+    const zoneId = await findZoneIdForChannel(newState.channelId);
+    if (!zoneId) {
+      // Kein Mapping => skip
+      return;
+    }
+    // userRoles => array of string IDs
+    const roles = newState.member?.roles.cache.map(r => r.id) || [];
+
+    // 4) ruf /tracking/join
+    try {
+      await axios.post(`${apiUrl}/tracking/join`, {
+        userId,
+        zoneId,
+        userRoles: roles,
+      });
+      logger.info(`[voiceStateUpdateNew] userJoined => zone=${zoneId}, userId=${userId}`);
+    } catch (err) {
+      logger.error("tracking/join failed:", err);
+    }
+  }
+  // 5) Jemand verlässt => oldState.channelId != null, newState.channelId == null
+  else if (oldState.channelId && !newState.channelId) {
+    // user leaves
+    const zoneId = await findZoneIdForChannel(oldState.channelId);
+    if (!zoneId) {
+      return;
+    }
+    try {
+      await axios.post(`${apiUrl}/tracking/leave`, {
+        userId,
+        zoneId,
+      });
+      logger.info(`[voiceStateUpdateNew] userLeft => zone=${zoneId}, userId=${userId}`);
+    } catch (err) {
+      logger.error("tracking/leave failed:", err);
+    }
+  }
+}
+
+// apps/Bot/src/interaction_handlers/selectMenuInteractions.ts
+
+import { StringSelectMenuInteraction, UserSelectMenuInteraction } from "discord.js";
+import logger from "../services/logger";
+
+/**
+ * Wir fassen beide möglichen Typen in einem Union-Typ zusammen:
+ */
+type AnySelectMenuInteraction = StringSelectMenuInteraction | UserSelectMenuInteraction;
+
+/**
+ * Haupt-Handler für *alle* SelectMenu-Interaktionen (StringSelect oder UserSelect).
+ */
+export async function handleSelectMenu(interaction: AnySelectMenuInteraction) {
+  // Debug
+  logger.info(
+    `[DEBUG] handleSelectMenu => customId=${interaction.customId}, user=${interaction.user.tag}`
+  );
+
+  const customId = interaction.customId;
+
+  // 1) StringSelectMenu
+  if (interaction.isStringSelectMenu() && customId === "zone_select_create") {
+    logger.info("[DEBUG] => isStringSelectMenu & zone_select_create");
+    const { handleZoneSelect } = require("../interactions/selectMenus/zoneSelectHandler");
+    return handleZoneSelect(interaction);
+  }
+
+  // 2) UserSelectMenu Allow
+  if (interaction.isUserSelectMenu() && customId === "voice_allow_select") {
+    logger.info("[DEBUG] => isUserSelectMenu & voice_allow_select");
+    const { handleVoiceAllowSelect } = require("../interactions/selectMenus/voiceAllowSelectMenu");
+    return handleVoiceAllowSelect(interaction);
+  }
+
+  // 3) UserSelectMenu Block
+  if (interaction.isUserSelectMenu() && customId === "voice_block_select") {
+    logger.info("[DEBUG] => isUserSelectMenu & voice_block_select");
+    const { handleVoiceBlockSelect } = require("../interactions/selectMenus/voiceBlockSelectMenu");
+    return handleVoiceBlockSelect(interaction);
+  }
+
+  // Fallback
+  logger.info("[DEBUG] => Fallback: Unbekanntes SelectMenu.");
+  return interaction.reply({
+    content: "Unbekannter SelectMenu.",
+    ephemeral: true,
+  });
+}
+
+
+// apps/Bot/src/interaction_handlers/setupInteractions.ts
+import { ButtonInteraction, Interaction } from 'discord.js';
+import axios from 'axios';
+
+/**
+ * Du rufst diese Funktion aus `interactionCreate` auf, wenn `customId` mit "setup:" beginnt.
+ */
+export async function handleSetupInteraction(interaction: Interaction) {
+  if (!interaction.isButton()) return;
+  if (!interaction.customId.startsWith('setup:')) return;
+
+  const subAction = interaction.customId.split(':')[1];
+  if (subAction === 'start') {
+    // Hier kommt dein API-Aufruf oder was du machen willst
+    // z.B. "interaction.reply('Los gehts mit dem Setup!')"
+    await interaction.reply({
+      content: 'Du hast den Setup-Button geklickt. Weiter geht\'s!',
+      ephemeral: true, // oder false
+    });
+  }
+}
+
+
+// apps/Bot/src/interaction_handlers/wizardInteractions.ts
+
+
+import { Interaction, ButtonInteraction } from 'discord.js';
+import axios from 'axios';
+import logger from '../services/logger';
+
+const apiUrl = process.env.API_URL || 'http://localhost:3004';
+
+export async function handleWizardInteraction(interaction: Interaction) {
+  if (!interaction.isButton()) return;
+  const { customId } = interaction as ButtonInteraction;
+
+  // wizard:start:catId => extrahieren
+  if (customId.startsWith('wizard:start')) {
+    const parts = customId.split(':'); // z.B. ['wizard','start','CAT_123']
+    const categoryId = parts[2] || 'NO_CATEGORY_ID';
+
+    // 1) /wizard/start
+    try {
+      await axios.post(`${apiUrl}/wizard/start`, {
+        userId: interaction.user.id,
+        categoryId,
+      });
+
+      await interaction.reply({
+        content: `Willst du Tracking aktivieren?\n(Deine Kategorie: ${categoryId})`,
+        ephemeral: true,
+        components: [
+          {
+            type: 1, // ActionRow
+            components: [
+              {
+                type: 2, // Button
+                label: 'Ja (Tracking)',
+                style: 3, // SUCCESS
+                customId: 'wizard:tracking_yes',
+              },
+              {
+                type: 2,
+                label: 'Nein (kein Tracking)',
+                style: 4, // DANGER
+                customId: 'wizard:tracking_no',
+              },
+            ],
+          },
+        ],
+      });
+    } catch (err) {
+      logger.error('wizard:start => error:', err);
+      await interaction.reply({ content: 'Fehler beim Wizard-Start', ephemeral: true });
+    }
+  }
+
+  // wizard:tracking_yes => DB => trackingActive=true
+  else if (customId === 'wizard:tracking_yes') {
+    try {
+      await axios.post(`${apiUrl}/wizard/step`, {
+        userId: interaction.user.id,
+        trackingActive: true,
+      });
+      // optional: finish
+      await axios.patch(`${apiUrl}/wizard/finish`, { userId: interaction.user.id });
+      await interaction.reply({
+        content: 'Tracking ist aktiviert! Setup abgeschlossen.',
+        ephemeral: true,
+      });
+    } catch (err) {
+      logger.error('wizard:tracking_yes => error:', err);
+      await interaction.reply({ content: 'Fehler beim Tracking-Aktivieren', ephemeral: true });
+    }
+  }
+
+  // wizard:tracking_no => DB => trackingActive=false
+  else if (customId === 'wizard:tracking_no') {
+    try {
+      await axios.post(`${apiUrl}/wizard/step`, {
+        userId: interaction.user.id,
+        trackingActive: false,
+      });
+      // optional: finish
+      await axios.patch(`${apiUrl}/wizard/finish`, { userId: interaction.user.id });
+      await interaction.reply({
+        content: 'Kein Tracking gewählt! Setup abgeschlossen.',
+        ephemeral: true,
+      });
+    } catch (err) {
+      logger.error('wizard:tracking_no => error:', err);
+      await interaction.reply({ content: 'Fehler beim Tracking-Deaktivieren', ephemeral: true });
+    }
+  }
+}
+
+// apps/Bot/src/routes/categoriesRouter.ts
+
+import { Router } from "express";
+import logger from "../services/logger";
+import {
+  createDiscordCategory,
+  renameDiscordCategory,
+  removeDiscordCategory,
+} from "../services/discordCategorySync";
+
+export const categoriesRouter = Router();
+
+/**
+ * POST /discord/categories
+ * => Erstellt in Discord eine Kategorie
+ */
+categoriesRouter.post("/", async (req, res) => {
+  try {
+    const { name, isVisible, allowedRoles } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "Missing 'name' in body" });
+    }
+
+    const discordChannelId = await createDiscordCategory(name, isVisible, allowedRoles);
+    return res.json({ ok: true, discordChannelId });
+  } catch (err) {
+    logger.error("[Bot] createDiscordCategory Error:", err);
+    return res.status(500).json({ error: "Internal Bot Error" });
+  }
+});
+
+/**
+ * PATCH /discord/categories
+ * => Umbennen einer vorhandenen Kategorie
+ * Body: { id, newName }
+ */
+categoriesRouter.patch("/", async (req, res) => {
+  try {
+    const { id, newName, isVisible, allowedRoles } = req.body;
+    if (!id || !newName) {
+      return res
+        .status(400)
+        .json({ error: "Missing 'id' or 'newName' in body" });
+    }
+    await renameDiscordCategory(id, newName, isVisible, allowedRoles);
+    return res.json({ ok: true });
+  } catch (err) {
+    logger.error("[Bot] renameDiscordCategory Error:", err);
+    return res.status(500).json({ error: "Internal Bot Error" });
+  }
+});
+
+/**
+ * DELETE /discord/categories/:discordId
+ * => Löscht die Kategorie in Discord
+ */
+categoriesRouter.delete("/:discordId", async (req, res) => {
+  try {
+    const { discordId } = req.params;
+    if (!discordId) {
+      return res
+        .status(400)
+        .json({ error: "Missing 'discordId' in URL" });
+    }
+    await removeDiscordCategory(discordId);
+    return res.json({ ok: true });
+  } catch (err) {
+    logger.error("[Bot] removeDiscordCategory Error:", err);
+    return res.status(500).json({ error: "Internal Bot Error" });
+  }
+});
+
+
+// apps/Bot/src/routes/messagesRouter.ts
+import { Router, Request, Response } from 'express';
+import { client } from '../index';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ChannelType,
+  EmbedBuilder,
+  TextChannel,
+} from 'discord.js';
+
+export const messagesRouter = Router();
+
+// Definiere ein Interface für das Request-Body
+interface MessageRequestBody {
+  channelId: string;
+  embed?: {
+    title?: string;
+    description?: string;
+    // ...etc. Falls du noch mehr Felder brauchst
+  };
+  components?: Array<{
+    type: 'button';
+    label?: string;
+    style?: 'primary'|'danger'|'success'|'secondary'|'link';
+    customId?: string;
+  }>;
+  content?: string;
+}
+
+/**
+ * POST /discord/messages
+ */
+messagesRouter.post('/', async (req: Request<unknown, unknown, MessageRequestBody>, res: Response) => {
+  const { channelId, embed, components, content } = req.body;
+
+  const guildId = process.env.GUILD_ID;
+  if (!guildId) {
+    return res.status(500).json({ error: 'No GUILD_ID in env' });
+  }
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild) {
+    return res.status(404).json({ error: `Guild ${guildId} not found` });
+  }
+
+  // Kanal abfragen
+  const channel = guild.channels.cache.get(channelId);
+  if (!channel) {
+    return res.status(404).json({ error: `Channel ${channelId} not found in guild` });
+  }
+  if (channel.type !== ChannelType.GuildText) {
+    return res.status(400).json({ error: 'Channel is not a text channel' });
+  }
+
+  // Embed bauen
+  let embedBuilder: EmbedBuilder | null = null;
+  if (embed) {
+    embedBuilder = new EmbedBuilder()
+      .setTitle(embed.title || 'Info')
+      .setDescription(embed.description || '')
+      .setColor(0x007fff);
+  }
+
+  // Buttons bauen
+  const rows = [];
+  if (components && components.length > 0) {
+    // Nur 1 Row als Beispiel
+    const row = new ActionRowBuilder<ButtonBuilder>();
+    components.forEach((c) => {
+      if (c.type === 'button') {
+        const btnStyle = mapButtonStyle(c.style);
+        const btn = new ButtonBuilder()
+          .setLabel(c.label || 'Button')
+          .setStyle(btnStyle)
+          .setCustomId(c.customId || 'btn:default');
+        row.addComponents(btn);
+      }
+      // Falls du später SelectMenus etc. hast, hier erweitern
+    });
+    rows.push(row);
+  }
+
+  try {
+    const textChannel = channel as TextChannel;
+    const msg = await textChannel.send({
+      content: content || undefined,
+      embeds: embedBuilder ? [embedBuilder] : [],
+      components: rows,
+    });
+
+    return res.json({ messageId: msg.id });
+  } catch (err) {
+    console.error('Error sending message:', err);
+    return res.status(500).json({ error: 'Bot error sending message' });
+  }
+});
+
+/** Hilfsfunktion, um Button-Styles zu mappen */
+function mapButtonStyle(style?: string) {
+  switch (style) {
+    case 'primary':
+      return ButtonStyle.Primary;
+    case 'success':
+      return ButtonStyle.Success;
+    case 'danger':
+      return ButtonStyle.Danger;
+    case 'secondary':
+      return ButtonStyle.Secondary;
+    case 'link':
+      return ButtonStyle.Link;
+    default:
+      return ButtonStyle.Primary;
+  }
+}
+
+
+// apps/Bot/src/routes/rolesRouter.ts
+
+import { Router } from "express";
+import logger from "../services/logger";
+import { client } from "../index";
+
+export const rolesRouter = Router();
+
+/**
+ * GET /discord/roles
+ * => Liefert alle Rollen
+ */
+rolesRouter.get("/", async (req, res) => {
+  try {
+    const guildId = process.env.GUILD_ID;
+    if (!guildId) {
+      return res
+        .status(400)
+        .json({ error: "GUILD_ID missing in .env" });
+    }
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+      return res
+        .status(404)
+        .json({ error: `Guild ${guildId} not found` });
+    }
+
+    const roles = guild.roles.cache.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      color: r.hexColor,
+      position: r.position,
+    }));
+    return res.json({ roles });
+  } catch (err) {
+    logger.error("GET /discord/roles Error:", err);
+    return res
+      .status(500)
+      .json({ error: "Internal Bot Error" });
+  }
+});
+
+
+
+
+// apps/Bot/src/routes/textChannelsRouter.ts
+import { Router } from 'express';
+import { client } from '../index';
+import { ChannelType, PermissionFlagsBits } from 'discord.js';
+
+export const textChannelsRouter = Router();
+
+/**
+ * POST /discord/text-channels
+ * Body: { channelName: string, parentCategoryId?: string, private?: boolean }
+ * => Erstellt in Discord einen Text-Kanal. Return: { discordChannelId }
+ */
+textChannelsRouter.post('/', async (req, res) => {
+  const { channelName, parentCategoryId, private: isPrivate } = req.body;
+  const guildId = process.env.GUILD_ID;
+  if (!guildId) {
+    return res.status(500).json({ error: 'No GUILD_ID in env' });
+  }
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild) {
+    return res.status(404).json({ error: `Guild ${guildId} not found` });
+  }
+
+  try {
+    const createdChannel = await guild.channels.create({
+      name: channelName || 'TEXT-CHANNEL',
+      type: ChannelType.GuildText,
+      parent: parentCategoryId || undefined,
+      reason: 'Automatisch via Setup',
+    });
+
+    // Falls "private: true" => Overwrites
+    if (isPrivate) {
+      // Standard: @everyone => deny ViewChannel
+      await createdChannel.permissionOverwrites.edit(guild.roles.everyone, {
+        ViewChannel: false,
+      });
+      // Bsp: Du könntest hier auch Admin-Rolle zulassen
+      // await createdChannel.permissionOverwrites.edit('1234567890', {
+      //   ViewChannel: true,
+      // });
+    }
+
+    return res.json({
+      discordChannelId: createdChannel.id,
+    });
+  } catch (err) {
+    console.error('Error creating text channel:', err);
+    return res.status(500).json({ error: 'Bot error creating channel' });
+  }
+});
+
++/**
++ * DELETE /discord/text-channels/:channelId
++ * => Löscht einen TextChannel
++ */
+textChannelsRouter.delete('/:channelId', async (req, res) => {
+    const { channelId } = req.params;
+    if (!channelId) {
+      return res.status(400).json({ error: 'Missing channel ID' });
+    }
+    try {
+      const guildId = process.env.GUILD_ID;
+      const guild = client.guilds.cache.get(guildId!);
+      if (!guild) {
+        return res.status(404).json({ error: `Guild ${guildId} not found` });
+      }
+      const channelToRemove = guild.channels.cache.get(channelId);
+      if (!channelToRemove) {
+        return res.status(404).json({ error: `Channel ${channelId} not found in guild` });
+      }
+      if (channelToRemove.type !== ChannelType.GuildText) {
+        return res.status(400).json({ error: 'Channel is not a TextChannel' });
+      }
+      await channelToRemove.delete('API => remove text channel');
+      console.log(`[Bot] TextChannel deleted => ${channelId}`);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('Error deleting text channel:', err);
+      return res.status(500).json({ error: 'Bot textChannel deletion error' });
+    }
+  });
+
+
+// apps/Bot/src/routes/voiceChannelsRouter.ts
+
+import { Router } from "express";
+import logger from "../services/logger";
+import { client } from "../index";
+import { ChannelsDeletedByApi } from "../index"; // <-- neu importieren
+
+export const voiceChannelsRouter = Router();
+
+/**
+ * POST /discord/voice-channels
+ * Body: { channelName, categoryId }
+ * => Erstellt in Discord einen Voice-Kanal
+ */
+voiceChannelsRouter.post("/", async (req, res) => {
+  const { channelName, categoryId } = req.body;
+  if (!channelName || !categoryId) {
+    return res
+      .status(400)
+      .json({ error: "Missing channelName or categoryId" });
+  }
+
+  try {
+    const guildId = process.env.GUILD_ID;
+    const guild = client.guilds.cache.get(guildId!);
+    if (!guild) {
+      return res
+        .status(404)
+        .json({ error: `Guild ${guildId} not found` });
+    }
+
+    // Category check
+    const parentChannel = guild.channels.cache.get(categoryId);
+    if (!parentChannel || parentChannel.type !== 4) {
+      return res
+        .status(400)
+        .json({ error: "Category not found or invalid type" });
+    }
+
+    // => type: 2 => GUILD_VOICE
+    const newChannel = await guild.channels.create({
+      name: channelName,
+      type: 2,
+      parent: parentChannel.id,
+    });
+
+    const discordChannelId = newChannel.id;
+
+    // (A) Permissions mit der Kategorie syncen
+    await newChannel.lockPermissions();
+    logger.info(`[Bot] lockPermissions => VoiceChannel ${discordChannelId} synced with parent`);
+
+    logger.info(`[Bot] Created VoiceChannel: id=${discordChannelId} name=${channelName}`);
+
+    return res.json({ ok: true, discordChannelId });
+  } catch (err) {
+    logger.error("[Bot] createVoiceChannelInDiscord Error:", err);
+    return res
+      .status(500)
+      .json({ error: "Bot create channel error" });
+  }
+});
+
+/**
+ * DELETE /discord/voice-channels/:discordChannelId
+ * => Löscht Voice-Kanal in Discord
+ */
+voiceChannelsRouter.delete("/:discordChannelId", async (req, res) => {
+  const discordChannelId = req.params.discordChannelId;
+  if (!discordChannelId) {
+    return res
+      .status(400)
+      .json({ error: "Missing channel ID in URL" });
+  }
+
+  try {
+    const guildId = process.env.GUILD_ID;
+    const guild = client.guilds.cache.get(guildId!);
+    if (!guild) {
+      return res
+        .status(404)
+        .json({ error: `Guild ${guildId} not found` });
+    }
+
+    const channelToRemove = guild.channels.cache.get(discordChannelId);
+    if (!channelToRemove) {
+      return res
+        .status(404)
+        .json({ error: `Channel ${discordChannelId} not found in guild` });
+    }
+    ChannelsDeletedByApi.add(discordChannelId);
+    await channelToRemove.delete("API => remove voice channel");
+    logger.info(`[Bot] VoiceChannel deleted => ${discordChannelId}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    logger.error("[Bot] deleteVoiceChannel Error:", err);
+    return res
+      .status(500)
+      .json({ error: "Bot delete channel error" });
+  }
+});
+
++ /**
++  * PATCH /discord/voice-channels/:discordChannelId
++  * Body: { newName?: string, newCategoryId?: string }
++  * => Ändert einen bestehenden Voice-Kanal in Discord
++  */
+ voiceChannelsRouter.patch("/:discordChannelId", async (req, res) => {
+   const discordChannelId = req.params.discordChannelId;
+   if (!discordChannelId) {
+     return res.status(400).json({ error: "Missing channel ID in URL" });
+   }
+
+   const { newName, newCategoryId } = req.body;
+   if (!newName && !newCategoryId) {
+     return res.status(400).json({ error: "No changes (newName / newCategoryId) provided" });
+   }
+
+   try {
+     const guildId = process.env.GUILD_ID;
+     const guild = client.guilds.cache.get(guildId!);
+     if (!guild) {
+       return res.status(404).json({ error: `Guild ${guildId} not found` });
+     }
+
+     const channelToPatch = guild.channels.cache.get(discordChannelId);
+     if (!channelToPatch) {
+       return res.status(404).json({ error: `Channel ${discordChannelId} not found in guild` });
+     }
+     // Check: Muss Voice-Kanal sein
+     if (channelToPatch.type !== 2) { // 2 = GUILD_VOICE
+       return res.status(400).json({ error: "Channel is not a VoiceChannel" });
+     }
+
+     // 1) Optional: rename
+     if (newName) {
+       await channelToPatch.setName(newName);
+       logger.info(`[Bot] Renamed voice channel ${discordChannelId} => ${newName}`);
+     }
+
+     // 2) Optional: re-parent -> newCategoryId
+     if (newCategoryId) {
+       const newCategory = guild.channels.cache.get(newCategoryId);
+       if (!newCategory || newCategory.type !== 4) { // 4 = GUILD_CATEGORY
+         return res.status(400).json({ error: "Invalid newCategoryId or not a Category" });
+       }
+         // (B) Option A: re-parent + dann lockPermissions()
+          // (B) Option B: via setParent(..., { lockPermissions: true })
+           await channelToPatch.setParent(newCategory.id, { lockPermissions: true });
+              logger.info(`[Bot] Moved voice channel ${discordChannelId} to category ${newCategoryId}`);
+     }
+
+     return res.json({ ok: true });
+   } catch (err) {
+     logger.error("[Bot] patchVoiceChannel error:", err);
+     return res.status(500).json({ error: "Bot patch channel error" });
+   }
+ });
+
+  /**
+  * DELETE /discord/voice-channels/:discordChannelId
+  * => Löscht Voice-Kanal in Discord
+  */
+ voiceChannelsRouter.delete('/:discordChannelId', async (req, res) => {
+   const discordChannelId = req.params.discordChannelId;
+   if (!discordChannelId) {
+     return res.status(400).json({ error: 'Missing channel ID in URL' });
+   }
+
+   try {
+     const guildId = process.env.GUILD_ID;
+     const guild = client.guilds.cache.get(guildId!);
+     if (!guild) {
+       return res
+         .status(404)
+         .json({ error: `Guild ${guildId} not found` });
+     }
+
+     const channelToRemove = guild.channels.cache.get(discordChannelId);
+     if (!channelToRemove) {
+       return res
+         .status(404)
+         .json({ error: `Channel ${discordChannelId} not found in guild` });
+     }
+
+     await channelToRemove.delete('API => remove voice channel');
+     console.log(`[Bot] VoiceChannel deleted => ${discordChannelId}`);
+     return res.json({ ok: true });
+   } catch (err) {
+     console.error('[Bot] deleteVoiceChannel Error:', err);
+     return res
+       .status(500)
+       .json({ error: 'Bot delete channel error' });
+   }
+ });
+
+ /**
+  * PATCH /discord/voice-channels/:discordChannelId
+  * Body: { newName?: string, newCategoryId?: string }
+  * => Ändert einen bestehenden Voice-Kanal in Discord
+  */
+ voiceChannelsRouter.patch('/:discordChannelId', async (req, res) => {
+  const discordChannelId = req.params.discordChannelId;
+   if (!discordChannelId) {
+     return res.status(400).json({ error: 'Missing channel ID in URL' });
+   }
+
+   const { newName, newCategoryId } = req.body;
+   if (!newName && !newCategoryId) {
+     return res.status(400).json({ error: 'No changes (newName / newCategoryId) provided' });
+   }
+
+   try {
+     const guildId = process.env.GUILD_ID;
+     const guild = client.guilds.cache.get(guildId!);
+     if (!guild) {
+       return res.status(404).json({ error: `Guild ${guildId} not found` });
+     }
+
+     const channelToPatch = guild.channels.cache.get(discordChannelId);
+     if (!channelToPatch) {
+       return res
+         .status(404)
+         .json({ error: `Channel ${discordChannelId} not found in guild` });
+     }
+     // Check: Muss Voice-Kanal sein
+     if (channelToPatch.type !== 2) { // 2 = GUILD_VOICE
+       return res.status(400).json({ error: 'Channel is not a VoiceChannel' });
+     }
+
+     // 1) Optional: rename
+     if (newName) {
+       await channelToPatch.setName(newName);
+       console.log(`[Bot] Renamed voice channel ${discordChannelId} => ${newName}`);
+     }
+
+     // 2) Optional: re-parent -> newCategoryId
+     if (newCategoryId) {
+       const newCategory = guild.channels.cache.get(newCategoryId);
+       // 4 = GUILD_CATEGORY
+       if (!newCategory || newCategory.type !== 4) {
+         return res.status(400).json({
+           error: 'Invalid newCategoryId or not a Category',
+         });
+       }
+       // Re-parent + Lock Permissions
+       await channelToPatch.setParent(newCategory.id, { lockPermissions: true });
+       console.log(`[Bot] Moved voice channel ${discordChannelId} to category ${newCategoryId}`);
+     }
+
+     return res.json({ ok: true });
+   } catch (err) {
+     console.error('[Bot] patchVoiceChannel error:', err);
+     return res.status(500).json({ error: 'Bot patch channel error' });
+   }
+ });
+
+
+
+
+// apps/Bot/src/services/discordCategorySync.ts
+
+import { client } from "../index";
+import { ChannelType, GuildChannel, PermissionFlagsBits, } from "discord.js";
+import { Collection, Snowflake, VoiceChannel } from "discord.js";
+import logger from "./logger";
+
+
+/**
+ * Legt in Discord eine neue Kategorie an.
+ * Return: die erstellte channelId (discordCategoryId).
+ */
+export async function createDiscordCategory(name: string, isVisible?: boolean, allowedRoles?: string[]): Promise<string> {
+  try {
+    const guildId = process.env.GUILD_ID;
+    if (!guildId) {
+      logger.warn("createDiscordCategory: Keine GUILD_ID in .env definiert!");
+      return "";
+    }
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+      logger.warn(`createDiscordCategory: Guild ${guildId} nicht gefunden.`);
+      return "";
+    }
+
+    const created = await guild.channels.create({
+      name,
+      type: ChannelType.GuildCategory,
+      reason: "Automatisch via API->Bot"
+    });
+
+    logger.info(`createDiscordCategory: Channel "${created.name}" erstellt (ID=${created.id}).`);
+
+        // (A) Wir erstellen ein Array ALLER gewünschten Overwrites
+        const overwrites = [];
+        const everyone = guild.roles.everyone;
+        const isCatVisible = isVisible ?? true; // Falls undefined => true
+    
+        if (isCatVisible) {
+          // isVisible=true => @everyone: ViewChannel = true
+          overwrites.push({
+            id: everyone.id,
+            allow: [PermissionFlagsBits.ViewChannel],
+          });
+        } else {
+          // isVisible=false => @everyone: ViewChannel = false
+          overwrites.push({
+            id: everyone.id,
+            deny: [PermissionFlagsBits.ViewChannel],
+          });
+          // allowedRoles => ViewChannel=true
+          for (const roleId of allowedRoles ?? []) {
+            if (roleId === everyone.id) continue;
+            overwrites.push({
+              id: roleId,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
+            });
+          }
+        }
+    
+        // (B) Einmaliges Setzen => Alle Overwrites in einem Rutsch
+        await created.permissionOverwrites.set(overwrites, "Initial Overwrites");
+        logger.info(`createDiscordCategory: Overwrites gesetzt für Channel ${created.id}`);
+    
+    return created.id;
+  } catch (err) {
+    logger.error("createDiscordCategory Fehler:", err);
+    return "";
+  }
+}
+
+/**
+ * Benennt eine existierende Discord-Kategorie (Channel) um.
+ * channelId => die Discord channel id
+ */
+export async function renameDiscordCategory(channelId: string, newName: string, isVisible?: boolean, allowedRoles?: string[]): Promise<void> {
+  try {
+    const guildId = process.env.GUILD_ID;
+    if (!guildId) {
+      logger.warn("renameDiscordCategory: Keine GUILD_ID in .env");
+      return;
+    }
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+      logger.warn(`renameDiscordCategory: Guild ${guildId} nicht gefunden.`);
+      return;
+    }
+
+    const channel = guild.channels.cache.get(channelId) as GuildChannel | undefined;
+    if (!channel) {
+      logger.warn(`renameDiscordCategory: Channel ${channelId} nicht gefunden!`);
+      return;
+    }
+
+    await channel.setName(newName);
+    logger.info(`renameDiscordCategory: Channel ${channel.id} umbenannt zu "${newName}".`);
+
+        // 2) Falls isVisible / allowedRoles => neu in EINEM Rutsch setzen
+        if (isVisible !== undefined) {
+          const overwritesArray = [];
+          const everyoneRole = guild.roles.everyone;
+          const catVisible = isVisible; // bool
+    
+          if (catVisible) {
+            // => @everyone: ViewChannel => true
+            overwritesArray.push({
+              id: everyoneRole.id,
+              allow: [PermissionFlagsBits.ViewChannel],
+            });
+          } else {
+            // => @everyone: ViewChannel => false
+            overwritesArray.push({
+              id: everyoneRole.id,
+              deny: [PermissionFlagsBits.ViewChannel],
+            });
+            // => allowedRoles => ViewChannel => true
+            for (const rId of allowedRoles ?? []) {
+              if (rId === everyoneRole.id) continue;
+              overwritesArray.push({
+                id: rId,
+                allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
+              });
+            }
+          }
+    
+          // (C) Einmaliges Setzen => vorhandene Overwrites werden entfernt
+          await channel.permissionOverwrites.set(overwritesArray, "Sync Overwrites rename");
+          logger.info(`renameDiscordCategory: Overwrites neu gesetzt => #${channel.id}`);
+        }
+            // (B) NEU: VoiceChannels via Type Guard filtern => c is VoiceChannel
+            const childVoiceChannels = guild.channels.cache.filter(
+              (c): c is VoiceChannel =>
+                c.parentId === channel.id &&
+                c.type === ChannelType.GuildVoice
+            );
+        
+            // (C) lockPermissions() auf jeden VoiceChannel anwenden
+            for (const [id, vc] of childVoiceChannels) {
+              try {
+                await vc.lockPermissions();
+                logger.info(
+                  `renameDiscordCategory: VoiceChannel #${vc.id} => lockPermissions() => synced to category #${channel.id}`
+                );
+              } catch (err) {
+                logger.warn(`renameDiscordCategory: lockPermissions fehlgeschlagen für #${vc.id}`, err);
+              }
+            }
+        
+            
+  } catch (err) {
+    logger.error("renameDiscordCategory Fehler:", err);
+  }
+}
+
+/**
+ * Löscht einen Channel in Discord.
+ * channelId => discordChannelId
+ */
+export async function removeDiscordCategory(channelId: string): Promise<void> {
+  try {
+    const guildId = process.env.GUILD_ID;
+    if (!guildId) {
+      logger.warn("removeDiscordCategory: Keine GUILD_ID in .env");
+      return;
+    }
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+      logger.warn(`removeDiscordCategory: Guild ${guildId} nicht gefunden.`);
+      return;
+    }
+
+    const channel = guild.channels.cache.get(channelId);
+    if (!channel) {
+      logger.warn(`removeDiscordCategory: Channel ${channelId} nicht (mehr) gefunden.`);
+      return;
+    }
+
+    await channel.delete("Automatische Löschung via API->Bot");
+    logger.info(`removeDiscordCategory: Channel ${channelId} gelöscht.`);
+  } catch (err) {
+    logger.error("removeDiscordCategory Fehler:", err);
+  }
+}
+
+
+
+import { createLogger, format, transports } from "winston";
+
+const { combine, timestamp, printf, colorize } = format;
+
+const myFormat = printf(({ level, message, timestamp }) => {
+  return `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+});
+
+const logger = createLogger({
+  // Hier passt du das Level an
+  level: process.env.LOG_LEVEL || "info",
+
+  format: combine(timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), colorize(), myFormat),
+  transports: [
+    new transports.Console(),
+    // optional: weitere Transports wie File-Logging
+    // new transports.File({ filename: 'logs/combined.log' })
+  ],
+});
+
+export default logger;
+
+
+
+// apps/Bot/src/botHttpServer.ts
+
+import express from "express";
+import logger from "./services/logger";
+
+// Unsere neuen Router-Dateien
+import { categoriesRouter } from "./routes/categoriesRouter";
+import { rolesRouter } from "./routes/rolesRouter";
+import { voiceChannelsRouter } from "./routes/voiceChannelsRouter";
+import { textChannelsRouter } from './routes/textChannelsRouter';
+import { messagesRouter } from './routes/messagesRouter';
+
+export function startBotHttpServer() {
+  const app = express();
+  app.use(express.json());
+
+  // Mounting der alten Routen (Kategorien) und neuen (VoiceChannels, Roles)
+  // => Pfade bleiben dieselben: /discord/categories, /discord/roles, /discord/voice-channels
+  app.use("/discord/categories", categoriesRouter);
+  app.use("/discord/roles", rolesRouter);
+  app.use("/discord/voice-channels", voiceChannelsRouter);
+  app.use('/discord/text-channels', textChannelsRouter);
+  app.use('/discord/messages', messagesRouter);
+
+  // Server starten
+  const port = process.env.BOT_HTTP_PORT || 3002;
+  app.listen(port, () => {
+    logger.info(`[Bot] HTTP-Server läuft auf Port ${port}`);
+  });
+}
+
+
+// apps/Bot/src/index.ts
+
+import "dotenv/config";
+import * as dotenv from "dotenv";
+import * as dotenvExpand from "dotenv-expand";
+import {
+  Client,
+  IntentsBitField,
+  Collection,
+  Interaction,
+  VoiceState,
+  StringSelectMenuInteraction,
+  UserSelectMenuInteraction,
+  Channel,
+  ChannelType,
+} from "discord.js";
+import fs from "fs";
+import path from "path";
+import axios from "axios";
+
+import logger from "./services/logger";
+import voiceStateUpdate from "./events/voiceStateUpdate";
+import { startBotHttpServer } from "./botHttpServer";
+
+
+// Merkt sich Voice-Kanäle, die wir selber per API löschen
+export const ChannelsDeletedByApi = new Set<string>();
+
+// 1) dotenv laden
+const myEnv = dotenv.config();
+dotenvExpand.expand(myEnv);
+
+// 2) Discord-Client erstellen
+const client = new Client({
+  intents: [
+    IntentsBitField.Flags.Guilds,
+    IntentsBitField.Flags.GuildMembers,
+    IntentsBitField.Flags.GuildVoiceStates,
+  ],
+});
+
+
+client.on("interactionCreate", async (interaction) => {
+  // ...
+  if (interaction.isButton()) {
+    // (A) Wizard
+    if (interaction.customId.startsWith("wizard:")) {
+      const { handleWizardInteraction } = require("./interaction_handlers/wizardInteractions");
+      return handleWizardInteraction(interaction);
+    }
+    // (B) Falls du noch andere Buttons hast, z.B. "voice_setting_..."
+    //     hier abfragen ...
+  }
+});
+
+
+// 3) Optional: Slash Command Collection
+(client as any).commands = new Collection<string, any>();
+
+// 3b) Falls du Slash-Commands laden willst (Ordner existiert?):
+const commandsPath = path.join(__dirname, "commands", "slashCommands");
+if (fs.existsSync(commandsPath)) {
+  const commandFiles = fs
+    .readdirSync(commandsPath)
+    .filter((file) => file.endsWith(".ts") || file.endsWith(".js"));
+
+  for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const commandModule = require(filePath);
+    if (commandModule.data && commandModule.execute) {
+      const cmdName = commandModule.data.name;
+      (client as any).commands.set(cmdName, {
+        data: commandModule.data,
+        execute: commandModule.execute,
+      });
+      logger.info(`Slash Command geladen: ${cmdName}`);
+    }
+  }
+}
+
+// 4) HTTP-Server starten
+startBotHttpServer();
+
+// 5) Interactions (slash/modal/selectMenu) — Button-Handling separat in wizardInteractions
+client.on("interactionCreate", async (interaction: Interaction) => {
+  // 5a) Slash Commands
+  if (interaction.isChatInputCommand()) {
+    const { commandName } = interaction;
+    const cmd = (client as any).commands.get(commandName);
+    if (!cmd) {
+      return interaction.reply({ content: "Unbekannter Slash-Befehl!", ephemeral: true });
+    }
+    try {
+      await cmd.execute(interaction);
+    } catch (err) {
+      logger.error("Slash Command Error:", err);
+      if (!interaction.replied) {
+        await interaction.reply({ content: "Fehler!", ephemeral: true });
+      }
+    }
+  }
+  // 5b) Button => (VERALTETER Code entfernt)
+  // 5c) ModalSubmit
+  else if (interaction.isModalSubmit()) {
+    const { handleModal } = require("./interaction_handlers/modalInteractions");
+    return handleModal(interaction);
+  }
+  // 5d) SelectMenu
+  else if (interaction.isAnySelectMenu()) {
+    const typedSelectMenu = interaction as StringSelectMenuInteraction | UserSelectMenuInteraction;
+    const { handleSelectMenu } = require("./interaction_handlers/selectMenuInteractions");
+    return handleSelectMenu(typedSelectMenu);
+  }
+});
+
+// 6) VoiceStateUpdate
+client.on("voiceStateUpdate", (oldState: VoiceState, newState: VoiceState) => {
+  voiceStateUpdate(oldState, newState);
+});
+
+// 7) channelDelete => Falls VoiceChannel in Discord manuell gelöscht wird
+client.on("channelDelete", async (channel: Channel) => {
+  if (channel.type === ChannelType.GuildVoice) {
+    if (ChannelsDeletedByApi.has(channel.id)) {
+      ChannelsDeletedByApi.delete(channel.id);
+      logger.info(`(channelDelete) => Kanal ${channel.id} via API gelöscht, ignoriere.`);
+      return;
+    }
+    const discordChannelId = channel.id;
+    const apiUrl = process.env.API_URL || "http://localhost:3000";
+    try {
+      await axios.patch(`${apiUrl}/voice-channels/discord-deleted`, {
+        discordChannelId,
+      });
+      logger.info(`channelDelete => Mark VC=${discordChannelId} as deletedInDiscord`);
+    } catch (err) {
+      logger.warn("API call for channelDelete failed:", err);
+    }
+  }
+});
+
+// 8) Bot-Login
+const token = process.env.DISCORD_TOKEN;
+if (!token) {
+  logger.error("Fehler: Keine DISCORD_TOKEN in .env");
+  process.exit(1);
+}
+client.login(token).then(() => {
+  logger.info("Bot online!");
+});
+
+export { client };
+
+
+
+
+packages\prisma\schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String?
+  email     String?   @unique
+  createdAt DateTime @default(now())
+}
+
+
+model Category {
+  id                  String   @id @default(cuid())
+  name                String
+  categoryType        String
+  allowedRoles        String[] @default([])
+  isVisible           Boolean  @default(true)
+  trackingActive      Boolean  @default(false)   
+  sendSetup           Boolean  @default(false)
+  lastUsage           DateTime?
+  totalSecondsInCateg Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
+  zones               Zone[]
+  discordCategoryId   String?
+  deletedInDiscord    Boolean  @default(false)
+  setupChannels SetupChannels[]
+}
+
+
+
+model Zone {
+  id              String   @id @default(cuid())
+  zoneKey         String   @unique        // NICHT löschen: Bot nutzt es
+  zoneName        String
+  minutesRequired Int      @default(60)
+  pointsGranted   Int      @default(1)
+  lastUsage           DateTime?
+  totalSecondsInZone  Int      @default(0)
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+  userStats  UserZoneStats[]
+  voiceChannels   VoiceChannel[]
+  deletedInDiscord Boolean  @default(false)
+}
+
+
+
+model SetupChannels {
+  id              String   @id @default(cuid())
+  categoryId      String
+  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  textChannelId   String?      // Discord-ID des gesperrten Textkanals
+  voiceChannelId  String?      // Discord-ID des Warte-Voice-Kanals
+  setupRoleId     String?      // Discord-ID der dynamischen Rolle
+  embedMessageId  String?      // Falls du die ID der Embed-Nachricht brauchst
+  createdAt       DateTime @default(now())
+}
+
+model DynamicVoiceChannel {
+  id             String   @id @default(cuid())
+  discordChannelId String  @unique    // Evtl. channelId -> discordChannelId umbenennen
+  discordRoleId    String? // dynamische Rolle falls vorhanden
+  zoneKey          String?
+  categoryId       String? // optional falls relevant
+  createdByUser    String?
+  createdAt        DateTime @default(now())
+  allowedUsers     String[] @default([])
+  blockedUsers     String[] @default([]) 
+}
+
+model VoiceChannel {
+  id              String   @id @default(cuid())
+  discordChannelId String? @unique
+  zoneId          String?
+  zone            Zone? @relation(fields: [zoneId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+  deletedInDiscord Boolean  @default(false)
+}
+
+model UserTracking {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  isTracked      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model RoleConfig {
+  id        String  @id @default(cuid())
+  roleKey   String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  @@unique([roleKey], map: "unique_roleKey")
+}
+
+model AdminSettings {
+  id                  String   @id @default(cuid())
+  voiceCategoryId     String?  // neu: optional, speichert CategoryChannel-ID
+  // ... 
+}
+
+// ========================================
+// UserZoneStats: zoneKey + NEU: zoneId
+// ========================================
+model UserZoneStats {
+  id                 String   @id @default(cuid())
+  userId             String
+  zoneKey            String
+  zoneId             String?
+  zone               Zone? @relation(fields: [zoneId], references: [id])
+  totalSecondsInZone Int      @default(0)
+  leftoverSeconds    Int      @default(0)
+  pointsInThisZone   Int      @default(0)
+  lastJoinTimestamp  DateTime?
+  lastUsage          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+}
+
+
+
+
+model UserGlobalStats {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  isTracked           Boolean  @default(false)
+  totalPoints         Int      @default(0)
+  totalTimeInAllZones Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
+}
+
+
+model WizardSession {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  categoryId  String?   // optional, falls wir die Category tracken
+  stepIndex   Int      @default(0)
+  trackingActive Boolean?
+  channelName String?   // Der Name, den der User eingibt
+  chosenZoneId String?  // Die Zone, die ausgewählt wurde
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}

@@ -18,10 +18,9 @@ export class ZonesService {
   ) {}
 
   // 1) READ ALL
-  findAll() {
-    return this.zoneFindService.findAll();
+  findAll(categoryId?: string) {
+    return this.zoneFindService.findAll(categoryId);
   }
-
   // 2) CREATE
   createZone(data: {
     zoneKey: string;
@@ -34,13 +33,16 @@ export class ZonesService {
   }
 
   // 3) UPDATE
-  updateZone(zoneId: string, data: {
-    zoneKey?: string;
-    zoneName?: string;
-    minutesRequired?: number;
-    pointsGranted?: number;
-    categoryId?: string | null;
-  }) {
+  updateZone(
+    zoneId: string,
+    data: {
+      zoneKey?: string;
+      zoneName?: string;
+      minutesRequired?: number;
+      pointsGranted?: number;
+      categoryId?: string | null;
+    },
+  ) {
     return this.zoneUpdateService.updateZone(zoneId, data);
   }
 

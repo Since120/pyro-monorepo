@@ -24,27 +24,26 @@ export function VisibilitySwitches({ isVisible, trackingActive, sendSetup, onCha
 
 	return (
 		<Stack spacing={2}>
-		  <Typography variant="h6">Optionen</Typography>
-		  <Stack direction="row" spacing={3} sx={{ flexWrap: "wrap" }}>
-			{/* Tracking ist IMMER sichtbar */}
-			<FormControlLabel
-			  control={<Switch checked={trackingActive} onChange={handleTrackingChange} />}
-			  label="Tracking aktivieren?"
-			/>
-        {/* Nur anzeigen, wenn trackingActive = true */}
-        {trackingActive && (
-          <>
-            <FormControlLabel
-              control={<Switch checked={isVisible} onChange={handleVisibleChange} />}
-              label="Kategorie Sichtbar?"
-            />
-            <FormControlLabel
-              control={<Switch checked={sendSetup} onChange={handleSendSetupChange} />}
-              label="Setup senden?"
-            />
-          </>
-        )}
-
+			<Typography variant="h6">Optionen</Typography>
+			<Stack direction="row" spacing={3} sx={{ flexWrap: "wrap" }}>
+				{/* Tracking ist IMMER sichtbar */}
+				<FormControlLabel
+					control={<Switch checked={trackingActive} onChange={handleTrackingChange} />}
+					label="Tracking aktivieren?"
+				/>
+				{/* Nur anzeigen, wenn trackingActive = true */}
+				{trackingActive && (
+					<>
+						<FormControlLabel
+							control={<Switch checked={isVisible} onChange={handleVisibleChange} />}
+							label="Kategorie Sichtbar?"
+						/>
+						<FormControlLabel
+							control={<Switch checked={sendSetup} onChange={handleSendSetupChange} />}
+							label="Setup senden?"
+						/>
+					</>
+				)}
 			</Stack>
 		</Stack>
 	);

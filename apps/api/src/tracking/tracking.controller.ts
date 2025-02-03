@@ -1,5 +1,11 @@
 // apps/api/src/tracking/tracking.controller.ts
-import { Body, Controller, HttpException, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpException,
+  HttpStatus,
+  Post,
+} from '@nestjs/common';
 import { TrackingService } from './tracking.service';
 
 @Controller('tracking')
@@ -11,11 +17,9 @@ export class TrackingController {
    * Body: { userId, zoneId, userRoles: string[] }
    */
   @Post('join')
-  async userJoinedZone(@Body() body: {
-    userId?: string;
-    zoneId?: string;
-    userRoles?: string[];
-  }) {
+  async userJoinedZone(
+    @Body() body: { userId?: string; zoneId?: string; userRoles?: string[] },
+  ) {
     if (!body.userId || !body.zoneId || !body.userRoles) {
       throw new HttpException(
         'Missing userId, zoneId or userRoles',

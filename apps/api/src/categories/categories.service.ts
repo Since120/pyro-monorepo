@@ -89,7 +89,7 @@ export class CategoriesService {
     return this.categoryRestore.restoreCategoryInDiscord(catId);
   }
 
-   /**
+  /**
    * 7) Find Category Name
    */
   findOne(catId: string) {

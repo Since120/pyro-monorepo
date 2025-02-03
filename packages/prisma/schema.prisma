@@ -30,7 +30,9 @@ model Category {
   zones               Zone[]
   discordCategoryId   String?
   deletedInDiscord    Boolean  @default(false)
-  setupChannels SetupChannels[]
+  mainRoleId          String?
+  setupChannels       SetupChannels[]
+  dynamicVoiceChannels DynamicVoiceChannel[]
 }
 
 
@@ -50,6 +52,7 @@ model Zone {
   userStats  UserZoneStats[]
   voiceChannels   VoiceChannel[]
   deletedInDiscord Boolean  @default(false)
+  dynamicVoiceChannels DynamicVoiceChannel[]
 }
 
 
@@ -66,16 +69,24 @@ model SetupChannels {
 }
 
 model DynamicVoiceChannel {
-  id             String   @id @default(cuid())
-  discordChannelId String  @unique    // Evtl. channelId -> discordChannelId umbenennen
-  discordRoleId    String? // dynamische Rolle falls vorhanden
-  zoneKey          String?
-  categoryId       String? // optional falls relevant
+  id               String   @id @default(cuid())
+  discordChannelId String?  @unique
+  discordRoleId    String?
+  zoneId           String?
+  zone             Zone? @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  categoryId       String?
+  category         Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  customName       String?
+  locked           Boolean  @default(false)
+  maxUsers         Int?
+  allowedUsers     String[] @default([])
+  blockedUsers     String[] @default([])
+  deletedInDiscord Boolean  @default(false)
   createdByUser    String?
   createdAt        DateTime @default(now())
-  allowedUsers     String[] @default([])
-  blockedUsers     String[] @default([]) 
+  updatedAt        DateTime @default(now()) @updatedAt
 }
+
 
 model VoiceChannel {
   id              String   @id @default(cuid())

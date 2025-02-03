@@ -24,38 +24,51 @@ export class CategoriesController {
       return await this.categoriesService.findAll();
     } catch (err) {
       console.error('Error in findAll():', err);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
   @Get(':id')
-async findOne(@Param('id') catId: string) {
-  if (!catId) throw new HttpException('catId missing', HttpStatus.BAD_REQUEST);
-  const category = await this.categoriesService.findOne(catId);
-  if (!category) {
-    throw new HttpException('Category not found', HttpStatus.NOT_FOUND);
+  async findOne(@Param('id') catId: string) {
+    if (!catId)
+      throw new HttpException('catId missing', HttpStatus.BAD_REQUEST);
+    const category = await this.categoriesService.findOne(catId);
+    if (!category) {
+      throw new HttpException('Category not found', HttpStatus.NOT_FOUND);
+    }
+    return category;
   }
-  return category;
-}
 
   // 2) POST /categories
   @Post()
-  async create(@Body() body: {
-    name: string;
-    categoryType: string;
-    isVisible?: boolean;
-    allowedRoles?: string[];
-    trackingActive?: boolean;
-    sendSetup?: boolean;
-  }) {
+  async create(
+    @Body()
+    body: {
+      name: string;
+      categoryType: string;
+      isVisible?: boolean;
+      allowedRoles?: string[];
+      trackingActive?: boolean;
+      sendSetup?: boolean;
+    },
+  ) {
     if (!body.name || !body.categoryType) {
-      throw new HttpException('name & categoryType required', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'name & categoryType required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     try {
       return await this.categoriesService.createCategory(body);
     } catch (err) {
       console.error('Error in create():', err);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -63,7 +76,10 @@ async findOne(@Param('id') catId: string) {
   @Patch('discord-deleted')
   async markAsDeletedInDiscord(@Body() body: { discordCategoryId: string }) {
     if (!body.discordCategoryId) {
-      throw new HttpException('Missing discordCategoryId', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Missing discordCategoryId',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     try {
       const res = await this.categoriesService.markAsDeletedInDiscord(
@@ -78,14 +94,18 @@ async findOne(@Param('id') catId: string) {
 
   // 4) PATCH /categories/:id => Update
   @Patch(':id')
-  async update(@Param('id') catId: string, @Body() body: {
-    name?: string;
-    categoryType?: string;
-    isVisible?: boolean;
-    allowedRoles?: string[];
-    trackingActive?: boolean;
-    sendSetup?: boolean;
-  }) {
+  async update(
+    @Param('id') catId: string,
+    @Body()
+    body: {
+      name?: string;
+      categoryType?: string;
+      isVisible?: boolean;
+      allowedRoles?: string[];
+      trackingActive?: boolean;
+      sendSetup?: boolean;
+    },
+  ) {
     if (!catId) {
       throw new HttpException('Missing categoryId', HttpStatus.BAD_REQUEST);
     }
@@ -93,7 +113,10 @@ async findOne(@Param('id') catId: string) {
       return await this.categoriesService.updateCategory(catId, body);
     } catch (err) {
       console.error('Error in update():', err);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -109,7 +132,10 @@ async findOne(@Param('id') catId: string) {
       console.error('Error in remove():', err);
       if (err instanceof HttpException) throw err;
 
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -117,12 +143,16 @@ async findOne(@Param('id') catId: string) {
   @Patch('restore/:id')
   async restoreCategoryInDiscord(@Param('id') catId: string) {
     try {
-      const result = await this.categoriesService.restoreCategoryInDiscord(catId);
+      const result =
+        await this.categoriesService.restoreCategoryInDiscord(catId);
       return { ok: true, data: result };
     } catch (err) {
       console.error('Error in restoreCategoryInDiscord:', err);
       if (err instanceof HttpException) throw err;
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -136,7 +166,10 @@ async findOne(@Param('id') catId: string) {
       return await this.categoriesService.deleteCategoryHard(catId);
     } catch (err) {
       console.error('Error in removeHard():', err);
-      throw new HttpException('Internal Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

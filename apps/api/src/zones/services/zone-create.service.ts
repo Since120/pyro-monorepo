@@ -21,12 +21,17 @@ export class ZoneCreateService {
         where: { id: data.categoryId },
       });
       if (!cat) {
-        throw new HttpException('Category does not exist', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          'Category does not exist',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       // If Category is in Setup Mode => skip Discord creation
       if (cat.sendSetup) {
-        console.warn(`[ZoneCreateService] Category ${cat.id} is in Setup mode => skipping VoiceChannel creation.`);
+        console.warn(
+          `[ZoneCreateService] Category ${cat.id} is in Setup mode => skipping VoiceChannel creation.`,
+        );
       }
     }
 
@@ -55,7 +60,10 @@ export class ZoneCreateService {
       });
       if (cat && !cat.sendSetup) {
         // => create in Discord
-        const createdId = await this.createDiscordVoiceChannel(newZone, newVC.id);
+        const createdId = await this.createDiscordVoiceChannel(
+          newZone,
+          newVC.id,
+        );
         if (createdId) {
           // update DB => set discordChannelId
           await this.prisma.voiceChannel.update({
@@ -72,12 +80,15 @@ export class ZoneCreateService {
   /**
    * Helper function to create a VoiceChannel in Discord, returns the discordChannelId or null.
    */
-  private async createDiscordVoiceChannel(zone: {
-    id: string;
-    zoneKey: string;
-    zoneName: string;
-    categoryId: string | null;
-  }, voiceChannelId: string): Promise<string | null> {
+  private async createDiscordVoiceChannel(
+    zone: {
+      id: string;
+      zoneKey: string;
+      zoneName: string;
+      categoryId: string | null;
+    },
+    voiceChannelId: string,
+  ): Promise<string | null> {
     if (!zone.categoryId) return null;
 
     const cat = await this.prisma.category.findUnique({
@@ -94,7 +105,10 @@ export class ZoneCreateService {
       });
       return resp.data.discordChannelId || null;
     } catch (err) {
-      console.warn('[ZoneCreateService] createDiscordVoiceChannel -> Error:', err);
+      console.warn(
+        '[ZoneCreateService] createDiscordVoiceChannel -> Error:',
+        err,
+      );
       return null;
     }
   }

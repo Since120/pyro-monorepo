@@ -16,13 +16,17 @@ export class SetupService {
    */
   async activateSetup(categoryId: string): Promise<SetupChannels> {
     // (A) Check category exist
-    const cat = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    const cat = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+    });
     if (!cat) {
       throw new HttpException('Category not found', HttpStatus.BAD_REQUEST);
     }
 
     // (B) Check if SetupChannels already exist
-    let existing = await this.prisma.setupChannels.findFirst({ where: { categoryId } });
+    const existing = await this.prisma.setupChannels.findFirst({
+      where: { categoryId },
+    });
     if (existing) {
       // Optional: Refresh? or do nothing
       return existing;
@@ -35,11 +39,13 @@ export class SetupService {
     let createdChannelId: string | null = null;
 
     try {
+      const isCatVisible = cat.isVisible ?? true;  // default: true
+
       const resp = await axios.post(`${botUrl}/discord/text-channels`, {
-        channelName,
-        parentCategoryId: cat.discordCategoryId, // optional, falls du es in der gleichen Kategorie willst
-        private: true, // z.B. nur Admins
-      });
+      channelName,
+      parentCategoryId: cat.discordCategoryId,
+      private: !isCatVisible, // Falls isVisible=false => private=true
+    });
       createdChannelId = resp.data.discordChannelId;
     } catch (error) {
       throw new HttpException(
@@ -55,7 +61,7 @@ export class SetupService {
       );
     }
 
-        // (C2) Bot => Erstelle Voice-Kanal (Warteraum)
+    // (C2) Bot => Erstelle Voice-Kanal (Warteraum)
     // Achtung: Endpunkt /discord/voice-channels erwartet "categoryId" und "channelName"
     // => Wir verwenden cat.discordCategoryId als "categoryId"
     // => z.B. WARTERAUM-KATEGORIE
@@ -63,7 +69,7 @@ export class SetupService {
     try {
       const vcResp = await axios.post(`${botUrl}/discord/voice-channels`, {
         channelName: `WARTERAUM-${cat.name}`.toUpperCase(),
-        categoryId: cat.discordCategoryId,  // Muss so heißen (nicht parentCategoryId!)
+        categoryId: cat.discordCategoryId, // Muss so heißen (nicht parentCategoryId!)
       });
       createdVoiceId = vcResp.data.discordChannelId;
     } catch (error) {
@@ -80,12 +86,11 @@ export class SetupService {
       );
     }
 
-
     // (D) Bot => Sende eine Embed-Nachricht mit Button "Setup"
     let messageId: string | null = null;
     try {
       const embedResp = await axios.post(`${botUrl}/discord/messages`, {
-        channelId: createdChannelId,
+        channelId: createdChannelId, // Dein zuvor erstellter Setup-TextChannel
         embed: {
           title: 'Kategorie-Setup',
           description: 'Klicke auf den Button, um das Setup zu starten.',
@@ -95,7 +100,8 @@ export class SetupService {
             type: 'button',
             label: 'Setup',
             style: 'primary',
-            customId: `wizard:start:${cat.id}`, // => wizard:start:CATID
+            // GANZ WICHTIG: Füge die categoryId hinten an, z.B. "setup:start:12345"
+            customId: `wizard:start:${cat.id}`,
           },
         ],
       });
@@ -119,47 +125,57 @@ export class SetupService {
 
     return newSetup;
   }
-
-    /**
-     * Löscht die erstellten Setup-Kanäle (Text + Voice)
-     * und entfernt den DB-Eintrag in setupChannels.
-     */
-    async deactivateSetup(categoryId: string): Promise<void> {
-      // 1) Eintrag suchen
-      const sc = await this.prisma.setupChannels.findFirst({
-        where: { categoryId },
-      });
-      if (!sc) {
-        // Kein Setup für diese Kategorie => nichts zu tun
-        return;
-      }
   
-      const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
   
-      // 2) TextChannel entfernen, falls vorhanden
-      if (sc.textChannelId) {
-        try {
-          await axios.delete(`${botUrl}/discord/text-channels/${sc.textChannelId}`);
-          // Du hast noch keinen "DELETE /discord/text-channels/:id" Endpoint?
-          // Dann könntest du  "voice-channels" Endpoint klonen 
-          // und analog "type=GuildText" löschen.
-        } catch (err) {
-          console.warn('Fehler beim Löschen des Setup-TextChannels:', err);
-        }
-      }
-  
-      // 3) VoiceChannel entfernen, falls vorhanden
-      if (sc.voiceChannelId) {
-        try {
-          await axios.delete(`${botUrl}/discord/voice-channels/${sc.voiceChannelId}`);
-        } catch (err) {
-          console.warn('Fehler beim Löschen des Setup-VoiceChannels:', err);
-        }
-      }
-  
-      // 4) DB-Eintrag löschen
-      await this.prisma.setupChannels.delete({
-        where: { id: sc.id },
-      });
+  async getSetupForCategory(categoryId: string) {
+    return this.prisma.setupChannels.findFirst({
+      where: { categoryId },
+    });
+  }
+  /**
+   * Löscht die erstellten Setup-Kanäle (Text + Voice)
+   * und entfernt den DB-Eintrag in setupChannels.
+   */
+  async deactivateSetup(categoryId: string): Promise<void> {
+    // 1) Eintrag suchen
+    const sc = await this.prisma.setupChannels.findFirst({
+      where: { categoryId },
+    });
+    if (!sc) {
+      // Kein Setup für diese Kategorie => nichts zu tun
+      return;
     }
+
+    const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+
+    // 2) TextChannel entfernen, falls vorhanden
+    if (sc.textChannelId) {
+      try {
+        await axios.delete(
+          `${botUrl}/discord/text-channels/${sc.textChannelId}`,
+        );
+        // Du hast noch keinen "DELETE /discord/text-channels/:id" Endpoint?
+        // Dann könntest du  "voice-channels" Endpoint klonen
+        // und analog "type=GuildText" löschen.
+      } catch (err) {
+        console.warn('Fehler beim Löschen des Setup-TextChannels:', err);
+      }
+    }
+
+    // 3) VoiceChannel entfernen, falls vorhanden
+    if (sc.voiceChannelId) {
+      try {
+        await axios.delete(
+          `${botUrl}/discord/voice-channels/${sc.voiceChannelId}`,
+        );
+      } catch (err) {
+        console.warn('Fehler beim Löschen des Setup-VoiceChannels:', err);
+      }
+    }
+
+    // 4) DB-Eintrag löschen
+    await this.prisma.setupChannels.delete({
+      where: { id: sc.id },
+    });
+  }
 }

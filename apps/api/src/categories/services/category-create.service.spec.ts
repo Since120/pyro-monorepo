@@ -6,7 +6,6 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SetupService } from '../../setup/setup.service';
 import axios from 'axios';
 
-
 // Wichtig: Hier unten mockst du das gesamte axios-Objekt
 jest.mock('axios');
 

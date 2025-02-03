@@ -8,13 +8,16 @@ import { PrismaClient } from '@prisma/client';
 export class ZoneUpdateService {
   private prisma = new PrismaClient();
 
-  async updateZone(zoneId: string, data: {
-    zoneKey?: string;
-    zoneName?: string;
-    minutesRequired?: number;
-    pointsGranted?: number;
-    categoryId?: string | null;
-  }) {
+  async updateZone(
+    zoneId: string,
+    data: {
+      zoneKey?: string;
+      zoneName?: string;
+      minutesRequired?: number;
+      pointsGranted?: number;
+      categoryId?: string | null;
+    },
+  ) {
     // 1) DB => update
     const updatedZone = await this.prisma.zone.update({
       where: { id: zoneId },
@@ -54,9 +57,15 @@ export class ZoneUpdateService {
       }
 
       try {
-        await axios.patch(`${botUrl}/discord/voice-channels/${vc.discordChannelId}`, patchPayload);
+        await axios.patch(
+          `${botUrl}/discord/voice-channels/${vc.discordChannelId}`,
+          patchPayload,
+        );
       } catch (err) {
-        console.warn(`[ZoneUpdateService] Bot-Patch failed for VC=${vc.id}`, err);
+        console.warn(
+          `[ZoneUpdateService] Bot-Patch failed for VC=${vc.id}`,
+          err,
+        );
       }
     }
 

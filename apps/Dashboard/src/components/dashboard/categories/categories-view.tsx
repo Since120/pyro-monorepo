@@ -33,9 +33,7 @@ export function CategoriesView({ categories }: CategoriesViewProps) {
 		setSelectedCatId(catId);
 	}, []);
 
-	const selectedCategory = selectedCatId
-    ? categories.find((c) => c.id === selectedCatId)
-    : null;
+	const selectedCategory = selectedCatId ? categories.find((c) => c.id === selectedCatId) : null;
 
 	return (
 		<Box sx={{ display: "flex", flex: "1 1 0", minHeight: 0 }}>

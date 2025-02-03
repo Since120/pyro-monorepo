@@ -1,10 +1,31 @@
-// apps/api/src/setup/setup.controller.ts
-import { Controller, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
+// Pfad: apps/api/src/setup/setup.controller.ts
+
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Body,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { SetupService } from './setup.service';
 
 @Controller('setup')
 export class SetupController {
   constructor(private setupService: SetupService) {}
+
+  @Get()
+  async getSetup(@Query('categoryId') categoryId: string) {
+    if (!categoryId) {
+      throw new HttpException("Missing categoryId", HttpStatus.BAD_REQUEST);
+    }
+    const setup = await this.setupService.getSetupForCategory(categoryId);
+    if (!setup) {
+      throw new HttpException("No setup found", HttpStatus.NOT_FOUND);
+    }
+    return setup;
+  }
 
   @Post('activate')
   async activate(@Body() body: { categoryId: string }) {

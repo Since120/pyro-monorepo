@@ -18,7 +18,7 @@ import { CategoryRestoreService } from './services/category-restore.service';
   imports: [PrismaModule, SetupModule],
   controllers: [CategoriesController],
   providers: [
-    CategoriesService,     // Haupt-Service (Delegation + findAll)
+    CategoriesService, // Haupt-Service (Delegation + findAll)
     CategoryCreateService,
     CategoryUpdateService,
     CategoryDeleteService,

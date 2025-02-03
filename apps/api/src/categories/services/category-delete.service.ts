@@ -42,7 +42,9 @@ export class CategoryDeleteService {
     if (cat.discordCategoryId) {
       try {
         const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
-        await axios.delete(`${botUrl}/discord/categories/${cat.discordCategoryId}`);
+        await axios.delete(
+          `${botUrl}/discord/categories/${cat.discordCategoryId}`,
+        );
       } catch (err) {
         console.error('Error while deleting Discord category:', err);
         throw new HttpException(
@@ -51,7 +53,9 @@ export class CategoryDeleteService {
         );
       }
     } else {
-      console.warn(`deleteCategory: Category ${catId} has NO discordCategoryId => skip Discord delete`);
+      console.warn(
+        `deleteCategory: Category ${catId} has NO discordCategoryId => skip Discord delete`,
+      );
     }
 
     // (E) Soft-delete => set deletedInDiscord=true
@@ -84,9 +88,14 @@ export class CategoryDeleteService {
     if (cat?.discordCategoryId) {
       const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
       try {
-        await axios.delete(`${botUrl}/discord/categories/${cat.discordCategoryId}`);
+        await axios.delete(
+          `${botUrl}/discord/categories/${cat.discordCategoryId}`,
+        );
       } catch (err) {
-        console.error('[HARD-DELETE] Error while deleting Discord category:', err);
+        console.error(
+          '[HARD-DELETE] Error while deleting Discord category:',
+          err,
+        );
       }
     }
 

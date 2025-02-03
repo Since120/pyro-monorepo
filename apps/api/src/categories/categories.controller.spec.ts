@@ -106,10 +106,10 @@ describe('CategoriesController (Integration)', () => {
 
       const resp = await request(app.getHttpServer())
         .delete('/categories/catNotExist')
-        .expect(HttpStatus.INTERNAL_SERVER_ERROR); 
-      // Weil im Code => if cat not found => throw NOT_FOUND. 
-      // Der Controller fängt HttpException => wirft 500, 
-      //   oder du könntest anpassen, dass er "passthrough" => 404. 
+        .expect(HttpStatus.INTERNAL_SERVER_ERROR);
+      // Weil im Code => if cat not found => throw NOT_FOUND.
+      // Der Controller fängt HttpException => wirft 500,
+      //   oder du könntest anpassen, dass er "passthrough" => 404.
       //   Aktuell schmeißt er "Error in remove(): ..."
 
       // Du könntest optional checken:
@@ -117,15 +117,17 @@ describe('CategoriesController (Integration)', () => {
     });
 
     it('returns 400 if zone exist', async () => {
-      (prisma.category.findUnique as jest.Mock).mockResolvedValue({ id: 'catZ' });
+      (prisma.category.findUnique as jest.Mock).mockResolvedValue({
+        id: 'catZ',
+      });
       (prisma.zone.count as jest.Mock).mockResolvedValueOnce(2);
 
       const res = await request(app.getHttpServer())
         .delete('/categories/catZ')
-        .expect(HttpStatus.INTERNAL_SERVER_ERROR); // selbes Problem: 
-      // Im Code -> BAD_REQUEST geworfen => 
-      //   Controller fängt => "Internal Server Error" => 500. 
-      //   Willst du es anpassen? 
+        .expect(HttpStatus.INTERNAL_SERVER_ERROR); // selbes Problem:
+      // Im Code -> BAD_REQUEST geworfen =>
+      //   Controller fängt => "Internal Server Error" => 500.
+      //   Willst du es anpassen?
     });
 
     it('deletes the category => set deletedInDiscord = true (happy path)', async () => {

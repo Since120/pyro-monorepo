@@ -28,7 +28,10 @@ export class CategoryUpdateService {
       where: { id: catId },
     });
     if (!oldCat) {
-      throw new HttpException('Category not found (oldCat)', HttpStatus.NOT_FOUND);
+      throw new HttpException(
+        'Category not found (oldCat)',
+        HttpStatus.NOT_FOUND,
+      );
     }
     const wasSetup = oldCat.sendSetup === true;
 
@@ -64,6 +67,26 @@ export class CategoryUpdateService {
       }
     }
 
+    // (C2) Falls isVisible (oder allowedRoles) geändert => Setup-Textkanal aktualisieren
+    if (data.isVisible !== undefined || data.allowedRoles !== undefined) {
+      // 1) SetupChannel in DB suchen
+      const setupEntry = await this.prisma.setupChannels.findFirst({
+        where: { categoryId: catId },
+      });
+      if (setupEntry?.textChannelId) {
+        const botUrl = process.env.BOT_SERVICE_URL || 'http://localhost:3002';
+        try {
+          // 2) PATCH /discord/text-channels/<textChannelId>
+          await axios.patch(`${botUrl}/discord/text-channels/${setupEntry.textChannelId}`, {
+            isVisible: data.isVisible ?? oldCat.isVisible,  // Fallback auf alten Wert, falls nur allowedRoles kamen
+            allowedRoles: data.allowedRoles ?? oldCat.allowedRoles,
+          });
+        } catch (err) {
+          console.warn('Fehler beim Patchen des Setup-TextChannels:', err);
+        }
+      }
+    }
+
     // (D) Setup toggle logic
     // 1) false -> true
     if (!wasSetup && isNowSetup) {
@@ -91,7 +114,9 @@ export class CategoryUpdateService {
   /**
    * Deletes all zone voice channels in Discord (but sets `discordChannelId=null` in DB, not deletedInDiscord).
    */
-  private async removeZoneVoiceChannelsWithoutSettingDeleted(categoryId: string) {
+  private async removeZoneVoiceChannelsWithoutSettingDeleted(
+    categoryId: string,
+  ) {
     const zones = await this.prisma.zone.findMany({
       where: { categoryId },
       include: { voiceChannels: true },
@@ -103,7 +128,9 @@ export class CategoryUpdateService {
         if (!vc.discordChannelId) continue; // already null => skip
         // A) remove in Discord
         try {
-          await axios.delete(`${botUrl}/discord/voice-channels/${vc.discordChannelId}`);
+          await axios.delete(
+            `${botUrl}/discord/voice-channels/${vc.discordChannelId}`,
+          );
         } catch (err) {
           console.warn('Error removing VC (Setup-Switch):', err);
         }
@@ -136,7 +163,10 @@ export class CategoryUpdateService {
   /**
    * Creates ONE voice channel in Discord, updates DB => discordChannelId
    */
-  private async recreateOneVoiceChannel(vc: { id: string; zoneId: string | null }) {
+  private async recreateOneVoiceChannel(vc: {
+    id: string;
+    zoneId: string | null;
+  }) {
     if (!vc.zoneId) return;
 
     const zone = await this.prisma.zone.findUnique({

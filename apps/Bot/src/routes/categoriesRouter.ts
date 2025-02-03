@@ -38,9 +38,7 @@ categoriesRouter.patch("/", async (req, res) => {
   try {
     const { id, newName, isVisible, allowedRoles } = req.body;
     if (!id || !newName) {
-      return res
-        .status(400)
-        .json({ error: "Missing 'id' or 'newName' in body" });
+      return res.status(400).json({ error: "Missing 'id' or 'newName' in body" });
     }
     await renameDiscordCategory(id, newName, isVisible, allowedRoles);
     return res.json({ ok: true });
@@ -58,9 +56,7 @@ categoriesRouter.delete("/:discordId", async (req, res) => {
   try {
     const { discordId } = req.params;
     if (!discordId) {
-      return res
-        .status(400)
-        .json({ error: "Missing 'discordId' in URL" });
+      return res.status(400).json({ error: "Missing 'discordId' in URL" });
     }
     await removeDiscordCategory(discordId);
     return res.json({ ok: true });

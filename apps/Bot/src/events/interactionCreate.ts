@@ -1,16 +1,43 @@
-// Pfad: apps/Bot/src/events/interactionCreate.ts
-import { Interaction } from 'discord.js';
-import { client } from '../index';
-import { handleWizardInteraction } from '../interaction_handlers/wizardInteractions'; // Unser Wizard-Handler
+// apps/Bot/src/events/interactionCreate.ts
 
+import { client } from "../index";
+import { Interaction } from "discord.js";
+import logger from "../services/logger";
+import { handleWizardInteraction } from "../interaction_handlers/wizardInteractions";
+import { handleSetupInteraction } from "../interaction_handlers/setupInteractions";
 
-client.on("interactionCreate", async (interaction) => {
-  // ... vorhandener Code, z.B. SlashCommands, etc.
+// NEU:
+import { handleVoiceNameModal } from "../interaction_handlers/wizardModalInteractions";
+import { handleWizardSelectMenu } from "../interaction_handlers/wizardSelectMenuInteractions";
 
+logger.info("[events/interactionCreate] => Datei geladen => Registriere Buttons...");
+
+client.on("interactionCreate", async (interaction: Interaction) => {
+  // 1) Button
   if (interaction.isButton()) {
+    logger.info(`[interactionCreate] => Button, customId=${interaction.customId}`);
+
     if (interaction.customId.startsWith("wizard:")) {
-      const { handleWizardInteraction } = require("./interaction_handlers/wizardInteractions");
       return handleWizardInteraction(interaction);
+    } else if (interaction.customId.startsWith("setup:")) {
+      return handleSetupInteraction(interaction);
+    }
+  }
+  // 2) Modal
+  else if (interaction.isModalSubmit()) {
+    logger.info(`[interactionCreate] => ModalSubmit, customId=${interaction.customId}`);
+
+    if (interaction.customId === "wizard:modal_voice_name") {
+      // => user hat voiceName eingegeben
+      return handleVoiceNameModal(interaction);
+    }
+  }
+  // 3) SelectMenu
+  else if (interaction.isStringSelectMenu()) {
+    logger.info(`[interactionCreate] => StringSelectMenu, customId=${interaction.customId}`);
+
+    if (interaction.customId === "wizard:select_zone") {
+      return handleWizardSelectMenu(interaction);
     }
   }
 });

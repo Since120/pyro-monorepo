@@ -17,7 +17,10 @@ export class CategoryRestoreService {
 
     // (B) check if it's actually deletedInDiscord
     if (!cat.deletedInDiscord) {
-      throw new HttpException('Category is not marked as deleted.', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Category is not marked as deleted.',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // (C) Bot => create new
@@ -56,9 +59,12 @@ export class CategoryRestoreService {
           });
 
           for (const vc of voiceChannels) {
-            await axios.patch(`${botUrl}/discord/voice-channels/${vc.discordChannelId}`, {
-              newCategoryId: discordChannelId,
-            });
+            await axios.patch(
+              `${botUrl}/discord/voice-channels/${vc.discordChannelId}`,
+              {
+                newCategoryId: discordChannelId,
+              },
+            );
           }
         }
       } catch (err) {

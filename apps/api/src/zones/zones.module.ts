@@ -15,17 +15,17 @@ import { VoiceChannelController } from './voice-channel/voice-channel.controller
 
 @Module({
   controllers: [
-    ZonesController,       // dein Zonen-Controller
-    VoiceChannelController // dein VoiceChannel-Controller
+    ZonesController, // dein Zonen-Controller
+    VoiceChannelController, // dein VoiceChannel-Controller
   ],
   providers: [
-    ZonesService,          // Haupt-Service (Orchestrierung)
-    VoiceChannelService,   // VoiceChannelService bleibt
+    ZonesService, // Haupt-Service (Orchestrierung)
+    VoiceChannelService, // VoiceChannelService bleibt
     ZoneFindService,
     ZoneCreateService,
     ZoneUpdateService,
     ZoneDeleteService,
-    ZoneBulkDeleteService
+    ZoneBulkDeleteService,
   ],
 })
 export class ZonesModule {}

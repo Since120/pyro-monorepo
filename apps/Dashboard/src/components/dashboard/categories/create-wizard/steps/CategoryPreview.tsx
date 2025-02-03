@@ -13,7 +13,8 @@ import Card from "@mui/material/Card";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { Check as CheckIcon } from "@phosphor-icons/react/dist/ssr/Check";
-import type { CategoryFormData } from "../types"; 
+
+import type { CategoryFormData } from "../types";
 
 export function CategoryPreview({ formData }: { formData: CategoryFormData }) {
 	const router = useRouter();
