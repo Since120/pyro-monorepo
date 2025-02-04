@@ -1,35 +1,38 @@
-// apps/Bot/src/events/channelDeleteHandler.ts
+// apps\Bot\src\events\channelDeleteHandler.ts
 
 import { Channel, ChannelType } from "discord.js";
-import logger from "../services/logger";
 import axios from "axios";
+import logger from "../services/logger";
+import { z } from "zod";
 
 /**
- * Wird aufgerufen, sobald im Discord ein Channel gelöscht wird.
- * Prüfe, ob es sich um eine Kategorie handelt, und informiere ggf. die API.
+ * Called whenever a Discord channel is deleted.
+ * Checks if it is a Category and informs the API if so.
  */
 export async function channelDeleteHandler(channel: Channel) {
   try {
-    // Nur weiter, wenn es eine Category ist
+    // Only proceed if it's a GuildCategory
     if (channel.type !== ChannelType.GuildCategory) {
       return;
     }
 
-    const channelId = channel.id; // Discord-Kanal-ID
-    logger.info(`[Bot] channelDelete: Category ${channelId} wurde manuell gelöscht.`);
+    // Validate channelId using Zod
+    const channelIdSchema = z.string().min(1);
+    const channelId = channelIdSchema.parse(channel.id);
 
-    // Der Bot sagt der API: "Channel X ist gelöscht" => wir nutzen dasselbe Feld `discordCategoryId`
+    logger.info(`[channelDeleteHandler] Category ${channelId} was manually deleted.`);
+
+    // Notify the API that this category is deleted
     const apiUrl = process.env.API_URL || "http://localhost:3004";
     const response = await axios.patch(`${apiUrl}/categories/discord-deleted`, {
-      // Sende dem API-Endpoint `discordCategoryId`
       discordCategoryId: channelId,
     });
 
     logger.info(
-      `[Bot] Meldung an API gesendet: Category ${channelId} gelöscht. Antwort:`,
+      `[channelDeleteHandler] Deletion notice sent to API for category ${channelId}. Response:`,
       response.data
     );
   } catch (err) {
-    logger.error("[Bot] Fehler in channelDeleteHandler:", err);
+    logger.error("[channelDeleteHandler] Error:", err);
   }
 }

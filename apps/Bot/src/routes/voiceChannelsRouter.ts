@@ -1,17 +1,16 @@
-// apps/Bot/src/routes/voiceChannelsRouter.ts
+// apps\Bot\src\routes\voiceChannelsRouter.ts
 
 import { Router } from "express";
 import logger from "../services/logger";
 import { client } from "../index";
-import { ChannelsDeletedByApi } from "../index"; // <-- neu importieren
-
+import { ChannelsDeletedByApi } from "../index";
+import { z } from "zod";
 
 export const voiceChannelsRouter = Router();
 
-
 /**
  * DELETE /discord/voice-channels/:discordChannelId
- * => Löscht Voice-Kanal in Discord
+ * Deletes a voice channel in Discord.
  */
 voiceChannelsRouter.delete("/:discordChannelId", async (req, res) => {
   const discordChannelId = req.params.discordChannelId;
@@ -30,104 +29,13 @@ voiceChannelsRouter.delete("/:discordChannelId", async (req, res) => {
     if (!channelToRemove) {
       return res.status(404).json({ error: `Channel ${discordChannelId} not found in guild` });
     }
+
     ChannelsDeletedByApi.add(discordChannelId);
     await channelToRemove.delete("API => remove voice channel");
-    logger.info(`[Bot] VoiceChannel deleted => ${discordChannelId}`);
+    logger.info(`[voiceChannelsRouter] Deleted voice channel=${discordChannelId}`);
     return res.json({ ok: true });
   } catch (err) {
-    logger.error("[Bot] deleteVoiceChannel Error:", err);
-    return res.status(500).json({ error: "Bot delete channel error" });
-  }
-});
-
-+(
-  /**
-+  * PATCH /discord/voice-channels/:discordChannelId
-+  * Body: { newName?: string, newCategoryId?: string }
-+  * => Ändert einen bestehenden Voice-Kanal in Discord
-+  */
-  voiceChannelsRouter.patch("/:discordChannelId", async (req, res) => {
-    const discordChannelId = req.params.discordChannelId;
-    if (!discordChannelId) {
-      return res.status(400).json({ error: "Missing channel ID in URL" });
-    }
-
-    const { newName, newCategoryId } = req.body;
-    if (!newName && !newCategoryId) {
-      return res.status(400).json({ error: "No changes (newName / newCategoryId) provided" });
-    }
-
-    try {
-      const guildId = process.env.GUILD_ID;
-      const guild = client.guilds.cache.get(guildId!);
-      if (!guild) {
-        return res.status(404).json({ error: `Guild ${guildId} not found` });
-      }
-
-      const channelToPatch = guild.channels.cache.get(discordChannelId);
-      if (!channelToPatch) {
-        return res.status(404).json({ error: `Channel ${discordChannelId} not found in guild` });
-      }
-      // Check: Muss Voice-Kanal sein
-      if (channelToPatch.type !== 2) {
-        // 2 = GUILD_VOICE
-        return res.status(400).json({ error: "Channel is not a VoiceChannel" });
-      }
-
-      // 1) Optional: rename
-      if (newName) {
-        await channelToPatch.setName(newName);
-        logger.info(`[Bot] Renamed voice channel ${discordChannelId} => ${newName}`);
-      }
-
-      // 2) Optional: re-parent -> newCategoryId
-      if (newCategoryId) {
-        const newCategory = guild.channels.cache.get(newCategoryId);
-        if (!newCategory || newCategory.type !== 4) {
-          // 4 = GUILD_CATEGORY
-          return res.status(400).json({ error: "Invalid newCategoryId or not a Category" });
-        }
-        // (B) Option A: re-parent + dann lockPermissions()
-        // (B) Option B: via setParent(..., { lockPermissions: true })
-        await channelToPatch.setParent(newCategory.id, { lockPermissions: true });
-        logger.info(`[Bot] Moved voice channel ${discordChannelId} to category ${newCategoryId}`);
-      }
-
-      return res.json({ ok: true });
-    } catch (err) {
-      logger.error("[Bot] patchVoiceChannel error:", err);
-      return res.status(500).json({ error: "Bot patch channel error" });
-    }
-  })
-);
-
-/**
- * DELETE /discord/voice-channels/:discordChannelId
- * => Löscht Voice-Kanal in Discord
- */
-voiceChannelsRouter.delete("/:discordChannelId", async (req, res) => {
-  const discordChannelId = req.params.discordChannelId;
-  if (!discordChannelId) {
-    return res.status(400).json({ error: "Missing channel ID in URL" });
-  }
-
-  try {
-    const guildId = process.env.GUILD_ID;
-    const guild = client.guilds.cache.get(guildId!);
-    if (!guild) {
-      return res.status(404).json({ error: `Guild ${guildId} not found` });
-    }
-
-    const channelToRemove = guild.channels.cache.get(discordChannelId);
-    if (!channelToRemove) {
-      return res.status(404).json({ error: `Channel ${discordChannelId} not found in guild` });
-    }
-
-    await channelToRemove.delete("API => remove voice channel");
-    console.log(`[Bot] VoiceChannel deleted => ${discordChannelId}`);
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error("[Bot] deleteVoiceChannel Error:", err);
+    logger.error("[voiceChannelsRouter] deleteVoiceChannel Error:", err);
     return res.status(500).json({ error: "Bot delete channel error" });
   }
 });
@@ -135,7 +43,7 @@ voiceChannelsRouter.delete("/:discordChannelId", async (req, res) => {
 /**
  * PATCH /discord/voice-channels/:discordChannelId
  * Body: { newName?: string, newCategoryId?: string }
- * => Ändert einen bestehenden Voice-Kanal in Discord
+ * Modifies an existing voice channel in Discord.
  */
 voiceChannelsRouter.patch("/:discordChannelId", async (req, res) => {
   const discordChannelId = req.params.discordChannelId;
@@ -143,7 +51,19 @@ voiceChannelsRouter.patch("/:discordChannelId", async (req, res) => {
     return res.status(400).json({ error: "Missing channel ID in URL" });
   }
 
-  const { newName, newCategoryId } = req.body;
+  const patchVoiceChannelSchema = z.object({
+    newName: z.string().min(1).optional(),
+    newCategoryId: z.string().min(1).optional(),
+  });
+
+  const parseResult = patchVoiceChannelSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    logger.warn("[voiceChannelsRouter] PATCH => invalid request body for voice channel update.");
+    return res.status(400).json({ error: "No changes (newName / newCategoryId) provided" });
+  }
+
+  const { newName, newCategoryId } = parseResult.data;
+
   if (!newName && !newCategoryId) {
     return res.status(400).json({ error: "No changes (newName / newCategoryId) provided" });
   }
@@ -159,54 +79,61 @@ voiceChannelsRouter.patch("/:discordChannelId", async (req, res) => {
     if (!channelToPatch) {
       return res.status(404).json({ error: `Channel ${discordChannelId} not found in guild` });
     }
-    // Check: Muss Voice-Kanal sein
+    // 2 = GUILD_VOICE
     if (channelToPatch.type !== 2) {
-      // 2 = GUILD_VOICE
       return res.status(400).json({ error: "Channel is not a VoiceChannel" });
     }
 
-    // 1) Optional: rename
+    // Rename
     if (newName) {
       await channelToPatch.setName(newName);
-      console.log(`[Bot] Renamed voice channel ${discordChannelId} => ${newName}`);
+      logger.info(
+        `[voiceChannelsRouter] Renamed voice channel=${discordChannelId} to '${newName}'`
+      );
     }
 
-    // 2) Optional: re-parent -> newCategoryId
+    // Re-parent
     if (newCategoryId) {
       const newCategory = guild.channels.cache.get(newCategoryId);
       // 4 = GUILD_CATEGORY
       if (!newCategory || newCategory.type !== 4) {
-        return res.status(400).json({
-          error: "Invalid newCategoryId or not a Category",
-        });
+        return res.status(400).json({ error: "Invalid newCategoryId or not a Category" });
       }
-      // Re-parent + Lock Permissions
       await channelToPatch.setParent(newCategory.id, { lockPermissions: true });
-      console.log(`[Bot] Moved voice channel ${discordChannelId} to category ${newCategoryId}`);
+      logger.info(
+        `[voiceChannelsRouter] Moved voice channel=${discordChannelId} to category=${newCategoryId}`
+      );
     }
 
     return res.json({ ok: true });
   } catch (err) {
-    console.error("[Bot] patchVoiceChannel error:", err);
+    logger.error("[voiceChannelsRouter] patchVoiceChannel error:", err);
     return res.status(500).json({ error: "Bot patch channel error" });
   }
 });
 
-
+/**
+ * POST /discord/voice-channels
+ * Creates a new voice channel in Discord.
+ */
 voiceChannelsRouter.post("/", async (req, res) => {
+  const createVoiceChannelSchema = z.object({
+    channelName: z.string().min(1),
+    categoryId: z.string().min(1),
+    roleId: z.string().optional(),
+    allowedRoles: z.array(z.string()).optional(),
+    sendSetup: z.boolean().optional(),
+  });
+
+  const parseResult = createVoiceChannelSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    logger.warn("[voiceChannelsRouter] POST => invalid request body for creating voice channel.");
+    return res.status(400).json({ error: "Missing or invalid channelName/categoryId" });
+  }
+
+  const { channelName, categoryId, roleId, allowedRoles, sendSetup } = parseResult.data;
+
   try {
-    const {
-      channelName,
-      categoryId,
-      roleId,        // NEU: vom Wizard
-      allowedRoles,  // NEU: array
-      sendSetup,     // NEU: boolean
-    } = req.body;
-
-    if (!channelName || !categoryId) {
-      return res.status(400).json({ error: "Missing channelName or categoryId" });
-    }
-
     const guildId = process.env.GUILD_ID;
     const guild = client.guilds.cache.get(guildId!);
     if (!guild) {
@@ -214,45 +141,44 @@ voiceChannelsRouter.post("/", async (req, res) => {
     }
 
     const parentChannel = guild.channels.cache.get(categoryId);
+    // 4 = GUILD_CATEGORY
     if (!parentChannel || parentChannel.type !== 4) {
       return res.status(400).json({ error: "Category not found or invalid type" });
     }
 
-    // 1) Erstelle VoiceChannel
-    // vorerst KEINE Overwrites => wir machen das manuell
+    // 2 = GUILD_VOICE
     const newChannel = await guild.channels.create({
       name: channelName,
-      type: 2, // Voice
+      type: 2,
       parent: parentChannel.id,
-      // permissionOverwrites: [] => wir setzen Overwrites gleich unten
     });
 
-    // 2) Wenn sendSetup = false => altes System
-    // => lockPermissions => Overwrites vererbt aus Category
     if (!sendSetup) {
-      // altes System
+      // Legacy system -> lockPermissions
       await newChannel.lockPermissions();
-      // => optional: Wenn roleId existiert, Overwrite "connect=true"
       if (roleId) {
         await newChannel.permissionOverwrites.create(roleId, {
           Connect: true,
           ViewChannel: true,
         });
       }
-
-      console.log(`[BOT] old system => lockPermissions done, roleId=?${roleId}`);
+      logger.info(
+        `[voiceChannelsRouter] Created voice channel=${newChannel.id} with lockPermissions (roleId=${roleId || "none"})`
+      );
     } else {
-      // 3) Wenn sendSetup = true => wir überschreiben manuell
-      console.log(`[BOT] setup=TRUE => manuelle Overwrites => no lockPermissions`);
+      // Manual overwrites
+      logger.info(
+        `[voiceChannelsRouter] Created voice channel=${newChannel.id} with custom overwrites => setup mode`
+      );
 
-      // @everyone => connect=false, viewChannel=false
+      // everyone => no connect, no view
       const everyone = guild.roles.everyone;
       await newChannel.permissionOverwrites.create(everyone, {
         Connect: false,
         ViewChannel: false,
       });
 
-      // allowedRoles => connect=false, viewChannel=true (sehen, aber nicht joinen)
+      // allowedRoles => can see, can't connect
       if (Array.isArray(allowedRoles)) {
         for (const rId of allowedRoles) {
           await newChannel.permissionOverwrites.create(rId, {
@@ -262,7 +188,7 @@ voiceChannelsRouter.post("/", async (req, res) => {
         }
       }
 
-      // Wizard-Rolle => connect=true, viewChannel=true
+      // roleId => can connect, can view
       if (roleId) {
         await newChannel.permissionOverwrites.create(roleId, {
           Connect: true,
@@ -271,10 +197,9 @@ voiceChannelsRouter.post("/", async (req, res) => {
       }
     }
 
-    // success
     return res.json({ ok: true, discordChannelId: newChannel.id });
   } catch (err) {
-    logger.error("[Bot] createVoiceChannel Error:", err);
+    logger.error("[voiceChannelsRouter] createVoiceChannel error:", err);
     return res.status(500).json({ error: "Bot create channel error" });
   }
 });

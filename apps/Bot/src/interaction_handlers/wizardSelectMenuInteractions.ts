@@ -1,58 +1,77 @@
-// Pfad: apps/Bot/src/interaction_handlers/wizardSelectMenuInteractions.ts
+// apps\Bot\src\interaction_handlers\wizardSelectMenuInteractions.ts
 
 import { StringSelectMenuInteraction, GuildMember } from "discord.js";
 import axios from "axios";
 import logger from "../services/logger";
+import { z } from "zod";
 
-// API-Endpunkte (zentrale Geschäftslogik) laufen auf Port 3004
+/**
+ * Handles wizard's select menu interactions when a user chooses a specific zone.
+ */
 const apiUrl = process.env.API_URL || "http://localhost:3004";
-// Bot-Endpunkte (z.B. zum Rollen-Management, Channel-Erstellung) laufen auf Port 3002
-const botUrl = process.env.BOT_SERVICE_URL || "http://localhost:3002";
+//const botUrl = process.env.BOT_SERVICE_URL || "http://localhost:3002";
 
 export async function handleWizardSelectMenu(interaction: StringSelectMenuInteraction) {
-  if (interaction.customId !== "wizard:select_zone") return;
+  // We only proceed if the customId is "wizard:select_zone"
+  if (interaction.customId !== "wizard:select_zone") {
+    return;
+  }
 
-  // Wir deferen die Antwort, damit wir später mit editReply antworten können.
+  // Defer the reply so we can edit it later
   await interaction.deferReply({ ephemeral: true });
 
-  // Der ausgewählte Zone-Wert
+  // We expect exactly one selected value for the zone
   const chosenZoneId = interaction.values[0];
-  logger.info(`[handleWizardSelectMenu] userId=${interaction.user.id}, zoneId=${chosenZoneId}`);
+
+  // Validate the chosen zoneId with Zod
+  const zoneIdSchema = z.string().min(1);
+  const parseResult = zoneIdSchema.safeParse(chosenZoneId);
+
+  if (!parseResult.success) {
+    logger.warn("[handleWizardSelectMenu] Invalid zoneId selected => aborting.");
+    await interaction.editReply({ content: "Invalid Zone selected." });
+    return;
+  }
+
+  logger.info(`[handleWizardSelectMenu] userId=${interaction.user.id}, zoneId=${parseResult.data}`);
 
   try {
-    // 1) API-Aufruf: Zone zuweisen, VoiceChannel erstellen und DVC-Datensatz aktualisieren.
+    // 1) Assign the zone to the DVC in the API
     const resp = await axios.patch(`${apiUrl}/dynamic-voice-channels/assign-zone`, {
       userId: interaction.user.id,
-      zoneId: chosenZoneId,
+      zoneId: parseResult.data,
     });
-    const updatedDVC = resp.data; // Erwartet: { id, zoneId, discordChannelId, … }
-    logger.info(`[handleWizardSelectMenu] assigned zone => dvc.id=${updatedDVC.id}, zoneId=${updatedDVC.zoneId}`);
+    const updatedDVC = resp.data;
+    logger.info(
+      `[handleWizardSelectMenu] Zone assigned => dvc.id=${updatedDVC.id}, zoneId=${updatedDVC.zoneId}`
+    );
 
-    // 2) Verschiebe den User in den neu erstellten VoiceChannel.
+    // 2) Attempt to move user to the newly created voice channel
     const member = interaction.member as GuildMember | null;
-    if (member && member.voice && member.voice.channelId) {
+    if (member?.voice?.channelId) {
       try {
         await member.voice.setChannel(updatedDVC.discordChannelId);
-        logger.info(`[handleWizardSelectMenu] Moved user ${interaction.user.id} to channel ${updatedDVC.discordChannelId}`);
+        logger.info(
+          `[handleWizardSelectMenu] Moved user=${interaction.user.id} to channel=${updatedDVC.discordChannelId}`
+        );
       } catch (moveErr) {
-        logger.error(`[handleWizardSelectMenu] Failed to move user:`, moveErr);
-        // Optional: Bei einem Fehler hier könnte man den User zusätzlich informieren.
+        logger.error("[handleWizardSelectMenu] Failed to move user:", moveErr);
       }
     } else {
-      logger.warn(`[handleWizardSelectMenu] Voice state of user ${interaction.user.id} not available; user konnte nicht verschoben werden.`);
+      logger.warn(
+        `[handleWizardSelectMenu] Voice state not available for user=${interaction.user.id}; cannot move user.`
+      );
     }
 
-    // 3) Sende eine abschließende Bestätigung.
+    // 3) Send final confirmation
     await interaction.editReply({
-      content: "Setup abgeschlossen – du wurdest in den neuen VoiceChannel verschoben.",
-      components: [] // Keine weiteren Buttons
+      content: "Setup completed. You have been moved to the new voice channel.",
+      components: [],
     });
   } catch (err) {
-    logger.error(`[handleWizardSelectMenu] => DB error`, err);
-    // Da wir bereits deferReply aufgerufen haben, verwenden wir reply nicht direkt,
-    // sondern editReply, um die Fehlernachricht zu senden.
+    logger.error("[handleWizardSelectMenu] Error assigning zone or moving user:", err);
     await interaction.editReply({
-      content: "Fehler beim Setzen der Zone!",
+      content: "An error occurred while setting the zone. Please try again.",
     });
   }
 }

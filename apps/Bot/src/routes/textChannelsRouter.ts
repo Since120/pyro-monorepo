@@ -1,76 +1,93 @@
-// Pfad: apps/Bot/src/routes/textChannelsRouter.ts
+// apps\Bot\src\routes\textChannelsRouter.ts
 
 import { Router } from "express";
 import { client } from "../index";
-import {
-  ChannelType,
-  PermissionFlagsBits,
-  OverwriteType,
-  OverwriteResolvable, // <-- Wichtig für TS
-} from "discord.js";
+import { ChannelType, PermissionFlagsBits, OverwriteType, OverwriteResolvable } from "discord.js";
+import { z } from "zod";
+import logger from "../services/logger";
 
 export const textChannelsRouter = Router();
 
 /**
  * POST /discord/text-channels
- * => Erzeugt einen Textkanal
+ * Creates a text channel.
  */
 textChannelsRouter.post("/", async (req, res) => {
-  const { channelName, parentCategoryId, private: isPrivate } = req.body;
+  const createTextChannelSchema = z.object({
+    channelName: z.string().optional(),
+    parentCategoryId: z.string().optional(),
+    private: z.boolean().optional(),
+  });
+
+  const parseResult = createTextChannelSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    logger.warn("[textChannelsRouter] POST => invalid request body for creating text channel.");
+    return res.status(400).json({ error: "Invalid request body" });
+  }
+
+  const { channelName, parentCategoryId, private: isPrivate } = parseResult.data;
+
   const guildId = process.env.GUILD_ID;
   if (!guildId) {
+    logger.error("[textChannelsRouter] No GUILD_ID in env variables.");
     return res.status(500).json({ error: "No GUILD_ID in env" });
   }
   const guild = client.guilds.cache.get(guildId);
   if (!guild) {
+    logger.warn(`[textChannelsRouter] Guild ${guildId} not found.`);
     return res.status(404).json({ error: `Guild ${guildId} not found` });
   }
 
   try {
-    // 1) Channel erstellen
     const createdChannel = await guild.channels.create({
       name: channelName || "TEXT-CHANNEL",
       type: ChannelType.GuildText,
       parent: parentCategoryId || undefined,
-      reason: "Automatisch via Setup",
+      reason: "Created via Setup",
     });
 
-    // 2) Falls private => @everyone darf NICHT ViewChannel
     if (isPrivate) {
       const overwrites: OverwriteResolvable[] = [
         {
           id: guild.roles.everyone.id,
-          deny: PermissionFlagsBits.ViewChannel, // BigInt
+          deny: PermissionFlagsBits.ViewChannel,
           type: OverwriteType.Role,
         },
       ];
       await createdChannel.permissionOverwrites.set(overwrites);
+      logger.info(`[textChannelsRouter] Created private text channel=${createdChannel.id}`);
+    } else {
+      logger.info(`[textChannelsRouter] Created public text channel=${createdChannel.id}`);
     }
 
     return res.json({ discordChannelId: createdChannel.id });
   } catch (err) {
-    console.error("Error creating text channel:", err);
+    logger.error("[textChannelsRouter] Error creating text channel:", err);
     return res.status(500).json({ error: "Bot error creating channel" });
   }
 });
 
 /**
  * DELETE /discord/text-channels/:channelId
- * => Löscht einen TextChannel
+ * Deletes a text channel.
  */
 textChannelsRouter.delete("/:channelId", async (req, res) => {
-  const { channelId } = req.params;
+  const channelId = req.params.channelId;
   if (!channelId) {
     return res.status(400).json({ error: "Missing channel ID" });
   }
+
   try {
     const guildId = process.env.GUILD_ID;
     const guild = client.guilds.cache.get(guildId!);
     if (!guild) {
+      logger.warn(`[textChannelsRouter] Guild ${guildId} not found.`);
       return res.status(404).json({ error: `Guild ${guildId} not found` });
     }
+
     const channelToRemove = guild.channels.cache.get(channelId);
     if (!channelToRemove) {
+      logger.warn(`[textChannelsRouter] Channel ${channelId} not found in guild.`);
       return res.status(404).json({ error: `Channel ${channelId} not found` });
     }
     if (channelToRemove.type !== ChannelType.GuildText) {
@@ -78,81 +95,88 @@ textChannelsRouter.delete("/:channelId", async (req, res) => {
     }
 
     await channelToRemove.delete("API => remove text channel");
-    console.log(`[Bot] TextChannel deleted => ${channelId}`);
+    logger.info(`[textChannelsRouter] Deleted text channel=${channelId}`);
     return res.json({ ok: true });
   } catch (err) {
-    console.error("Error deleting text channel:", err);
-    return res
-      .status(500)
-      .json({ error: "Bot textChannel deletion error" });
+    logger.error("[textChannelsRouter] Error deleting text channel:", err);
+    return res.status(500).json({ error: "Bot textChannel deletion error" });
   }
 });
 
 /**
  * PATCH /discord/text-channels/:channelId
- * => Ändert Overwrites je nach isVisible + allowedRoles
+ * Modifies channel overwrites (visibility, allowed roles).
  */
 textChannelsRouter.patch("/:channelId", async (req, res) => {
-  const { channelId } = req.params;
-  const { isVisible, allowedRoles } = req.body;
-
-  const guildId = process.env.GUILD_ID;
-  const guild = client.guilds.cache.get(guildId!);
-  if (!guild) {
-    return res.status(404).json({ error: `Guild ${guildId} not found` });
-  }
-  const channel = guild.channels.cache.get(channelId);
-  if (!channel) {
-    return res.status(404).json({ error: "TextChannel not found" });
-  }
-  if (channel.type !== ChannelType.GuildText) {
-    return res.status(400).json({ error: "Channel is not a TextChannel" });
+  const channelId = req.params.channelId;
+  if (!channelId) {
+    return res.status(400).json({ error: "Missing channel ID" });
   }
 
-  if (typeof isVisible !== "boolean") {
-    return res
-      .status(400)
-      .json({ error: "Missing or invalid isVisible:boolean" });
+  const patchChannelSchema = z.object({
+    isVisible: z.boolean(),
+    allowedRoles: z.array(z.string()).optional(),
+  });
+
+  const parseResult = patchChannelSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    logger.warn("[textChannelsRouter] PATCH => invalid request body.");
+    return res.status(400).json({ error: "Invalid request body" });
   }
+  const { isVisible, allowedRoles } = parseResult.data;
 
-  // 1) Everyone
-  const everyoneId = guild.roles.everyone.id;
+  try {
+    const guildId = process.env.GUILD_ID;
+    const guild = client.guilds.cache.get(guildId!);
+    if (!guild) {
+      return res.status(404).json({ error: `Guild ${guildId} not found` });
+    }
+    const channel = guild.channels.cache.get(channelId);
+    if (!channel) {
+      return res.status(404).json({ error: "TextChannel not found" });
+    }
+    if (channel.type !== ChannelType.GuildText) {
+      return res.status(400).json({ error: "Channel is not a TextChannel" });
+    }
 
-  // 2) Overwrites-Array
-  const overwrites: OverwriteResolvable[] = [];
+    logger.debug(
+      `[textChannelsRouter] Updating channel=${channelId} => isVisible=${isVisible}, allowedRolesCount=${
+        allowedRoles?.length || 0
+      }`
+    );
 
-  if (isVisible) {
-    // => @everyone => allow ViewChannel
-    overwrites.push({
-      id: everyoneId,
-      allow: PermissionFlagsBits.ViewChannel,
-      type: OverwriteType.Role,
-    });
-  } else {
-    // => @everyone => deny ViewChannel
-    overwrites.push({
-      id: everyoneId,
-      deny: PermissionFlagsBits.ViewChannel,
-      type: OverwriteType.Role,
-    });
+    const everyoneId = guild.roles.everyone.id;
+    const overwrites: OverwriteResolvable[] = [];
 
-    // => allowedRoles => allow
-    for (const roleId of allowedRoles ?? []) {
+    // @everyone
+    if (isVisible) {
       overwrites.push({
-        id: roleId,
+        id: everyoneId,
         allow: PermissionFlagsBits.ViewChannel,
         type: OverwriteType.Role,
       });
-    }
-  }
+    } else {
+      overwrites.push({
+        id: everyoneId,
+        deny: PermissionFlagsBits.ViewChannel,
+        type: OverwriteType.Role,
+      });
 
-  // 3) Overwrites setzen
-  try {
+      // allowedRoles => allow
+      for (const roleId of allowedRoles ?? []) {
+        overwrites.push({
+          id: roleId,
+          allow: PermissionFlagsBits.ViewChannel,
+          type: OverwriteType.Role,
+        });
+      }
+    }
+
     await channel.permissionOverwrites.set(overwrites);
+    logger.info(`[textChannelsRouter] Updated overwrites for text channel=${channelId}`);
+    return res.json({ ok: true });
   } catch (err) {
-    console.warn("Fehler beim Setzen der Overwrites:", err);
+    logger.error("[textChannelsRouter] Failed to set overwrites:", err);
     return res.status(500).json({ error: "Failed to set textChannel overwrites" });
   }
-
-  return res.json({ ok: true });
 });

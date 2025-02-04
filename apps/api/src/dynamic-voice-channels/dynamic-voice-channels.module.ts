@@ -4,6 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { DynamicVoiceChannelsService } from './dynamic-voice-channels.service';
 import { DynamicVoiceChannelsController } from './dynamic-voice-channels.controller';
 
+
 @Module({
   imports: [PrismaModule],
   controllers: [DynamicVoiceChannelsController],

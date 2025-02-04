@@ -1,61 +1,85 @@
+// apps\Bot\src\interaction_handlers\setupInteractions.ts
+
 import { ButtonInteraction, Interaction } from "discord.js";
 import axios from "axios";
+import logger from "../services/logger";
 import { checkWaitingRoom } from "../utils/waitingRoomHelper";
-
-const apiUrl = process.env.API_URL || "http://localhost:3004";
+import { z } from "zod";
 
 /**
- * Wird aufgerufen, wenn ein Button-Interaction mit customId "setup:..." ausgelöst wird.
+ * Setup interactions are triggered by buttons with customId starting with "setup:".
+ * We validate the input, confirm the user is in the correct waiting room,
+ * and optionally set up a WizardSession for further steps.
  */
 export async function handleSetupInteraction(interaction: Interaction) {
-  // 1) Nur Button-Interaction relevant
-  if (!interaction.isButton()) return;
+  // Only proceed if it's a Button
+  if (!interaction.isButton()) {
+    return;
+  }
 
-  // 2) Prüfen, ob die customId mit "setup:" beginnt
-  if (!interaction.customId.startsWith("setup:")) return;
+  // Check if the customId starts with "setup:"
+  if (!interaction.customId.startsWith("setup:")) {
+    return;
+  }
 
-  // 3) Beispiel: "setup:start:<categoryId>"
-  //    Wir splitten in ["setup","start","<categoryId>"]
+  /**
+   * Example of a customId: "setup:start:<categoryId>"
+   * We split by ":" and expect parts: ["setup","start","<categoryId>"]
+   */
   const parts = interaction.customId.split(":");
-  // parts[0] = "setup"
-  // parts[1] = "start" (oder was anderes, falls du mehr Sub-Actions hast)
-  // parts[2] = <categoryId> (sehr wichtig!)
-  const subAction = parts[1];
-  const categoryIdFromButton = parts[2];
 
-  // Falls was fehlt, abbrechen
-  if (!subAction || !categoryIdFromButton) {
-    console.log("Setup-Button ohne gültige Kategorie geklickt:", interaction.customId);
+  // Zod schema for subAction and categoryId
+  const setupActionSchema = z.object({
+    subAction: z.string().min(1),
+    categoryId: z.string().min(1),
+  });
+
+  // Attempt to parse subAction and categoryId using the schema
+  const parsed = setupActionSchema.safeParse({
+    subAction: parts[1],
+    categoryId: parts[2],
+  });
+
+  // If parsing fails, log a warning and return
+  if (!parsed.success) {
+    logger.warn(`[handleSetupInteraction] Invalid setup customId => ${interaction.customId}`);
     return;
   }
 
-  // 4) Prüfen, ob der User wirklich im richtigen Warteraum der jeweiligen Kategorie sitzt
-  const inWaitingRoom = await checkWaitingRoom(interaction as ButtonInteraction, categoryIdFromButton);
+  const { subAction, categoryId } = parsed.data;
+  logger.info(
+    `[handleSetupInteraction] subAction=${subAction}, categoryId=${categoryId}, userId=${interaction.user.id}`
+  );
+
+  // Check if the user is in the correct waiting room
+  const inWaitingRoom = await checkWaitingRoom(interaction as ButtonInteraction, categoryId);
   if (!inWaitingRoom) {
-    console.log("Setup abgebrochen: User nicht im korrekten Warteraum.");
+    logger.warn(
+      "[handleSetupInteraction] User is not in the correct waiting room. Aborting setup."
+    );
     return;
   }
 
-  // 5) (Optional) Wizard-Session auf die richtige Kategorie setzen,
-  //    damit nachfolgende Steps dieselbe categoryId verwenden.
+  // Optional: Set wizard session to the correct category for subsequent steps
+  const apiUrl = process.env.API_URL || "http://localhost:3004";
   try {
     await axios.post(`${apiUrl}/wizard/start`, {
       userId: interaction.user.id,
-      categoryId: categoryIdFromButton,
+      categoryId,
     });
+    logger.debug("[handleSetupInteraction] Wizard session set successfully.");
   } catch (err) {
-    console.warn("WizardSession konnte nicht aktualisiert werden:", err);
+    logger.warn("[handleSetupInteraction] Could not update wizard session:", err);
   }
 
-  // 6) Jetzt je nach subAction handeln
+  // Handle the specific subAction
   if (subAction === "start") {
-    // Beispiel-Antwort:
     await (interaction as ButtonInteraction).reply({
       content: "Du hast den Setup-Button geklickt. Weiter geht's!",
       ephemeral: true,
     });
+    logger.info("[handleSetupInteraction] Setup start button clicked => responded to user.");
   }
 
-  // Falls du weitere Aktionen hast (z.B. "setup:stop:<catId>" o.ä.),
-  // könntest du hier if/else ergänzen.
+  // Additional subActions (e.g. "stop", etc.) could be handled with further if/else logic
 }
